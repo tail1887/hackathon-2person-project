@@ -25,12 +25,14 @@
 - 선택:
 - 이유:
 - 반영 결과:
+- 근거: [의사결정 로그](../0_커플들이_집착하는_AI_심판이_되었다_기획서.md#14-의사결정-로그) · [관련 문서](../1_MVP_명세.md) · [관련 커밋](https://github.com/tail1887/hackathon-2person-project/commits/main/)
 
 ### 2. [주제]
 
 - 선택:
 - 이유:
 - 반영 결과:
+- 근거: [의사결정 로그](../0_커플들이_집착하는_AI_심판이_되었다_기획서.md#14-의사결정-로그) · [관련 문서](../1_MVP_명세.md) · [관련 커밋](https://github.com/tail1887/hackathon-2person-project/commits/main/)
 
 ## 작업·검증 기록
 
