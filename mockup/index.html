@@ -342,6 +342,7 @@
           <div id="proposer-counteroffer-box" style="display:none; margin-top:12px;"></div>
           <div style="display:flex; gap:8px; margin-top:14px;">
             <button class="btn btn-outline flex-1" style="flex:1;" onclick="openNegotiationHistory()">무승부 협상 기록 보기</button>
+            <button class="btn btn-secondary flex-1" id="btn-proposer-cancel" style="display:none; flex:1;" onclick="cancelNegotiation()">계속 대국</button>
             <button class="btn btn-primary flex-1" id="btn-edit-counteroffer" style="display:none; flex:1;" onclick="beginCounterofferRevision()">수정하기</button>
           </div>
         </div>
@@ -362,6 +363,21 @@
             <button class="btn btn-outline btn-block" onclick="openCounterofferModal()">카운터오퍼 메시지 보내기</button>
             <button class="btn btn-secondary btn-block" onclick="cancelNegotiation()">계속 대국하기</button>
           </div>
+        </div>
+      </div>
+
+      <!-- 카운터오퍼를 보낸 응답자의 수정 대기 화면 -->
+      <div id="negotiation-responder-status-view" style="display: none;">
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; gap:8px; align-items:flex-start;">
+            <div>
+              <div class="card-title">카운터오퍼를 보냈어요</div>
+              <div class="card-sub">상대가 수정한 새 제안을 보낼 때까지 기존 제안을 수락하거나 다시 카운터오퍼를 보낼 수 없습니다.</div>
+            </div>
+            <span class="tag tag-pending">제안자 수정 대기</span>
+          </div>
+          <div id="responder-status-counteroffer" style="margin-top:12px;"></div>
+          <button class="btn btn-outline btn-block" style="margin-top:14px;" onclick="openNegotiationHistory()">무승부 협상 기록 보기</button>
         </div>
       </div>
     </div>
@@ -710,7 +726,7 @@
         const hasCounteroffer = Boolean(state.room.drawProposal.counteroffer);
         document.getElementById('draw-banner-text').innerText = isProposer
           ? (hasCounteroffer ? '카운터오퍼가 도착했습니다. 제안을 수정할 수 있습니다.' : '상대방의 수락/카운터오퍼 대기 중')
-          : '상대방의 무승부 제안이 도착했습니다.';
+          : (hasCounteroffer ? '카운터오퍼를 보냈습니다. 상대의 수정 제안을 기다리고 있어요.' : '상대방의 무승부 제안이 도착했습니다.');
       } else {
         banner.style.display = 'none';
       }
@@ -898,11 +914,13 @@
       const pView = document.getElementById('negotiation-proposer-view');
       const pStatusView = document.getElementById('negotiation-proposer-status-view');
       const rView = document.getElementById('negotiation-responder-view');
+      const rStatusView = document.getElementById('negotiation-responder-status-view');
 
       if (!state.room.hasDrawProposal) {
         pView.style.display = 'block';
         pStatusView.style.display = 'none';
         rView.style.display = 'none';
+        rStatusView.style.display = 'none';
         renderProposerForm();
       } else {
         const isProposer = state.room.drawProposal.proposer === state.currentUser;
@@ -917,11 +935,19 @@
             renderProposerStatus();
           }
           rView.style.display = 'none';
+          rStatusView.style.display = 'none';
         } else {
           pView.style.display = 'none';
           pStatusView.style.display = 'none';
-          rView.style.display = 'block';
-          renderResponderForm();
+          if (state.room.drawProposal.status === 'counter_requested') {
+            rView.style.display = 'none';
+            rStatusView.style.display = 'block';
+            renderResponderStatus();
+          } else {
+            rView.style.display = 'block';
+            rStatusView.style.display = 'none';
+            renderResponderForm();
+          }
         }
       }
     }
@@ -941,6 +967,14 @@
         counterBox.innerHTML = `<div class="notice-box"><strong>${name}의 카운터오퍼</strong><br>${escapeHtml(prop.counteroffer.body)}</div>`;
       }
       document.getElementById('btn-edit-counteroffer').style.display = hasCounteroffer ? 'inline-flex' : 'none';
+      document.getElementById('btn-proposer-cancel').style.display = hasCounteroffer ? 'none' : 'inline-flex';
+    }
+
+    function renderResponderStatus() {
+      const counteroffer = state.room.drawProposal.counteroffer;
+      document.getElementById('responder-status-counteroffer').innerHTML = `
+        <div class="notice-box"><strong>내 카운터오퍼</strong><br>${escapeHtml(counteroffer.body)}</div>
+      `;
     }
 
     function renderReadOnlyConditions(conditions) {
@@ -1063,6 +1097,7 @@
 
     function acceptNegotiation() {
       const prop = state.room.drawProposal;
+      if (!prop || prop.status !== 'open' || prop.proposer === state.currentUser) return;
       
       // If has conditions, extract selected
       if (prop.conditions && prop.conditions.length > 0) {
@@ -1097,6 +1132,8 @@
     }
 
     function openCounterofferModal() {
+      const prop = state.room.drawProposal;
+      if (!prop || prop.status !== 'open' || prop.proposer === state.currentUser) return;
       openSheet('SHEET_COUNTEROFFER');
     }
 
@@ -1107,19 +1144,18 @@
         return;
       }
       const prop = state.room.drawProposal;
-      if (!prop || prop.proposer === state.currentUser) return;
+      if (!prop || prop.status !== 'open' || prop.proposer === state.currentUser) return;
       prop.status = 'counter_requested';
       prop.counteroffer = { author: state.currentUser, body: val };
       state.room.negotiationHistory.push({ type: 'counteroffer', revision: prop.revision, author: state.currentUser, body: val });
       closeSheet('SHEET_COUNTEROFFER');
       document.getElementById('counteroffer-msg-input').value = '';
-      alert('카운터오퍼 메시지가 대국방에 전송되었습니다. 제안자가 확인 후 제안을 수정할 수 있습니다.');
       showView('VIEW_ROOM');
     }
 
     function cancelNegotiation() {
       const prop = state.room.drawProposal;
-      if (!prop) return;
+      if (!prop || prop.status !== 'open') return;
       state.room.negotiationHistory.push({ type: 'cancelled', revision: prop.revision, actor: state.currentUser });
       state.room.hasDrawProposal = false;
       state.room.drawProposal = null;
