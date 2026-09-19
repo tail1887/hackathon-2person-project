@@ -110,9 +110,11 @@ function renderRoom() {
       const reviewBannerBtn = document.getElementById('btn-room-review-banner');
       const reviewBtn = document.getElementById('btn-room-review');
       const reviewHistoryBtn = document.getElementById('btn-review-history-in-sheet');
+      const currentReviewRecordId = review?.status === 'ready' ? review.recordId : null;
+      const hasPreviousReviewRecords = state.room.reviewRecords.some(record => record.id !== currentReviewRecordId);
       reviewBanner.style.display = 'none';
       reviewBannerBtn.style.display = 'none';
-      reviewHistoryBtn.style.display = state.room.reviewRecords.length ? 'inline-flex' : 'none';
+      reviewHistoryBtn.style.display = hasPreviousReviewRecords ? 'inline-flex' : 'none';
       reviewBtn.disabled = false;
       reviewBtn.onclick = requestRoomReview;
       reviewBtn.innerText = '⚖️ AI 문철 신청하기';

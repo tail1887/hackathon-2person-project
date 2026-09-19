@@ -150,9 +150,13 @@ function openRoomReview() {
 
 function openReviewHistory() {
       const list = document.getElementById('review-history-list');
-      list.innerHTML = state.room.reviewRecords.map((record, index) => {
+      const currentReviewRecordId = state.room.reviewRequest?.status === 'ready'
+        ? state.room.reviewRequest.recordId
+        : null;
+      const previousRecords = state.room.reviewRecords.filter(record => record.id !== currentReviewRecordId);
+      list.innerHTML = previousRecords.map((record, index) => {
         const requester = record.requester === 'A' ? '민준' : '서연';
-        return `<div class="card"><div class="card-title">문철 ${state.room.reviewRecords.length - index}</div><div class="card-sub">${requester} 신청 · ${record.createdAt} · 읽기 전용</div><button class="btn btn-sm btn-outline" style="margin-top: 10px;" onclick="openReviewRecord('${record.id}', false)">이 문철 보기</button></div>`;
+        return `<div class="card"><div class="card-title">이전 문철 ${previousRecords.length - index}</div><div class="card-sub">${requester} 신청 · ${record.createdAt} · 읽기 전용</div><button class="btn btn-sm btn-outline" style="margin-top: 10px;" onclick="openReviewRecord('${record.id}', false)">이 문철 보기</button></div>`;
       }).join('');
       openSheet('SHEET_MUNCHEOL_HISTORY');
     }
@@ -381,4 +385,3 @@ function resetAllData() {
 
 // 목업 초기 화면
 renderAll();
-
