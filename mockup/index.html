@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 심판 — M1.2 페이즈 1.5 인터랙티브 목업</title>
+  <style>
+    :root {
+      --bg-color: #f4f6f8;
+      --card-bg: #ffffff;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --secondary: #6b7280;
+      --accent: #ec4899;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --border: #e5e7eb;
+      --text: #1f2937;
+      --text-muted: #6b7280;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text); padding-bottom: 40px; }
+
+    /* Control Bar */
+    .control-bar {
+      background: #1e1b4b; color: white; padding: 12px 16px;
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;
+      position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    }
+    .control-group { display: flex; align-items: center; gap: 8px; }
+    .user-btn {
+      padding: 6px 14px; border-radius: 20px; font-weight: 600; cursor: pointer; border: none; font-size: 0.85rem;
+      transition: all 0.2s; background: rgba(255,255,255,0.15); color: #cbd5e1;
+    }
+    .user-btn.active { background: var(--accent); color: white; box-shadow: 0 0 8px rgba(236,72,153,0.5); }
+    .scenario-select {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white;
+      padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; outline: none;
+    }
+    .scenario-select option { background: #1e1b4b; color: white; }
+
+    /* App Shell Container */
+    .app-container {
+      max-width: 480px; margin: 20px auto; background: var(--card-bg);
+      border-radius: 16px; min-height: 780px; box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+      display: flex; flex-direction: column; overflow: hidden; position: relative; border: 1px solid var(--border);
+    }
+
+    /* App Header */
+    .app-header {
+      background: white; padding: 14px 18px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10;
+    }
+    .app-title { font-weight: 700; font-size: 1.05rem; color: var(--primary); display: flex; align-items: center; gap: 6px; }
+    .user-badge { font-size: 0.75rem; background: #e0e7ff; color: var(--primary); padding: 3px 8px; border-radius: 12px; font-weight: 600; }
+    .btn-icon { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--secondary); padding: 4px; }
+
+    /* Screen Views */
+    .view { display: none; padding: 18px; flex: 1; flex-direction: column; }
+    .view.active { display: flex; }
+
+    /* Card & Section */
+    .section-title { font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .card { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+    .card-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 6px; color: var(--text); }
+    .card-sub { font-size: 0.8rem; color: var(--text-muted); }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; justify-content: center; align-items: center; padding: 10px 16px;
+      border-radius: 8px; font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer; transition: background 0.2s; gap: 6px; text-decoration: none;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+    .btn-secondary:hover { background: #e5e7eb; }
+    .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+    .btn-accent { background: var(--accent); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-block { width: 100%; }
+    .btn-sm { padding: 6px 10px; font-size: 0.8rem; border-radius: 6px; }
+
+    /* Status Tags */
+    .tag { font-size: 0.72rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; display: inline-block; }
+    .tag-active { background: #dcfce7; color: #15803d; }
+    .tag-closed { background: #f3f4f6; color: #6b7280; }
+    .tag-pending { background: #fef3c7; color: #b45309; }
+
+    /* Chat Elements */
+    .chat-container { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px 0; }
+    .msg-bubble { max-width: 80%; padding: 10px 14px; border-radius: 14px; font-size: 0.88rem; line-height: 1.4; position: relative; }
+    .msg-left { align-self: flex-start; background: #f3f4f6; color: #1f2937; border-bottom-left-radius: 2px; }
+    .msg-right { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
+    .msg-sender { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 3px; font-weight: 600; }
+    .msg-recommended { border: 1.5px dashed #818cf8; }
+    .msg-badge { font-size: 0.65rem; background: rgba(255,255,255,0.25); color: white; padding: 2px 5px; border-radius: 4px; margin-left: 4px; }
+
+    /* Bottom Action Area in Chat */
+    .chat-bottom { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .chat-tools { display: flex; gap: 6px; }
+    .chat-input-row { display: flex; gap: 8px; }
+    .chat-input { flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 0.9rem; resize: none; outline: none; }
+    .chat-input:focus { border-color: var(--primary); }
+
+    /* Modal / Sheet Overlay */
+    .sheet-overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.5); z-index: 50;
+      display: none; justify-content: flex-end; flex-direction: column;
+    }
+    .sheet-overlay.active { display: flex; }
+    .sheet-content {
+      background: white; border-top-left-radius: 20px; border-top-right-radius: 20px;
+      padding: 20px; max-height: 85%; overflow-y: auto; box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+      animation: slideUp 0.25s ease-out;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+    /* Forms & Negotiation */
+    .form-group { margin-bottom: 12px; }
+    .form-label { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block; color: var(--text); }
+    .form-control { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 0.88rem; outline: none; }
+    .radio-group, .checkbox-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+    .radio-label, .checkbox-label { font-size: 0.85rem; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+    /* Draw Negotiation Item */
+    .condition-item { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; background: #fafafa; }
+    .condition-header { display: flex; justify-content: space-between; font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+
+    .notice-box { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; border-radius: 8px; padding: 10px 12px; font-size: 0.82rem; margin-bottom: 12px; }
+    .warning-box { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 8px; padding: 10px 12px; font-size: 0.82rem; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Controller Bar -->
+  <div class="control-bar">
+    <div class="control-group">
+      <span style="font-size:0.85rem; color:#cbd5e1; font-weight:600;">현재 사용자 시점:</span>
+      <button class="user-btn active" id="btn-user-a" onclick="switchUser('A')">민준 (사용자 A · 방 생성자)</button>
+      <button class="user-btn" id="btn-user-b" onclick="switchUser('B')">서연 (사용자 B · 초대받은 자)</button>
+    </div>
+    <div class="control-group">
+      <span style="font-size:0.85rem; color:#cbd5e1; font-weight:600;">시나리오 빠른 실행:</span>
+      <select class="scenario-select" onchange="loadScenario(this.value)">
+        <option value="default">시나리오 1: 메인 & 방 만들기/입장</option>
+        <option value="chat_ai">시나리오 2: 초안 작성 & AI 심판(Normal/Restricted)</option>
+        <option value="draw_cond">시나리오 3-1: 무승부 협상 (조건 선택 수락)</option>
+        <option value="draw_zero">시나리오 3-2: 무승부 협상 (조건 0개 수락)</option>
+        <option value="draw_counter">시나리오 3-3: 무승부 협상 (카운터오퍼)</option>
+        <option value="mission">시나리오 4: 미션 보드 & 상태 이동</option>
+      </select>
+      <button class="btn btn-sm btn-secondary" onclick="resetAllData()">리셋</button>
+    </div>
+  </div>
+
+  <!-- App Shell -->
+  <div class="app-container">
+    <!-- Header -->
+    <div class="app-header">
+      <button class="btn-icon" id="btn-header-back" onclick="navigateBack()" style="visibility: hidden;">←</button>
+      <div class="app-title">
+        ⚖️ AI 심판
+        <span class="user-badge" id="header-user-badge">민준 (A)</span>
+      </div>
+      <button class="btn-icon" onclick="showView('VIEW_MAIN')">🏠</button>
+    </div>
+
+    <!-- 1. VIEW_MAIN: 메인 화면 -->
+    <div class="view active" id="VIEW_MAIN">
+      <!-- 미션 영역 (우선 표시) -->
+      <div class="section-title">
+        <span>📌 활성 미션 (우선 표시)</span>
+        <button class="btn btn-sm btn-outline" onclick="showView('VIEW_MISSION_BOARD')">전체보기</button>
+      </div>
+
+      <div id="main-mission-container">
+        <!-- JS injected -->
+      </div>
+
+      <!-- 대국 영역 -->
+      <div class="section-title" style="margin-top: 10px;">
+        <span>⚔️ 대국 목록</span>
+      </div>
+
+      <div id="main-active-game-container">
+        <!-- JS injected -->
+      </div>
+
+      <div id="main-past-games-container">
+        <!-- JS injected -->
+      </div>
+
+      <div style="margin-top: auto; padding-top: 10px;">
+        <button class="btn btn-primary btn-block" onclick="showView('VIEW_START_GAME')">⚔️ 대국 시작하기</button>
+      </div>
+    </div>
+
+    <!-- 2. VIEW_START_GAME: 대국 시작 화면 -->
+    <div class="view" id="VIEW_START_GAME">
+      <div class="section-title">대국 시작하기</div>
+
+      <div class="card">
+        <div class="card-title">1. 새로운 대국방 만들기</div>
+        <div class="card-sub" style="margin-bottom: 10px;">상대방을 초대하여 새로운 대국을 진행합니다.</div>
+        <button class="btn btn-primary btn-block" onclick="createRoomAsA()">대국방 만들기 (방 생성자)</button>
+      </div>
+
+      <div class="card" style="margin-top: 10px;">
+        <div class="card-title">2. 초대 코드로 입장</div>
+        <div class="card-sub" style="margin-bottom: 10px;">공유받은 6자리 입장 코드를 입력해 입장합니다.</div>
+        <div class="form-group">
+          <input type="text" id="input-invite-code" class="form-control" placeholder="6자리 초대 코드 (예: 123456)" value="123456">
+        </div>
+        <button class="btn btn-outline btn-block" onclick="joinRoomWithCode()">초대 코드로 입장 (B 시점)</button>
+      </div>
+    </div>
+
+    <!-- 2-1. VIEW_INVITE_WAIT: 초대 대기 화면 -->
+    <div class="view" id="VIEW_INVITE_WAIT">
+      <div class="card" style="text-align: center; padding: 24px 14px;">
+        <div style="font-size: 2.5rem; margin-bottom: 10px;">💌</div>
+        <div class="card-title" style="font-size: 1.1rem;">대국방을 준비했어요</div>
+        <div class="card-sub" style="margin-bottom: 16px;">상대방에게 초대 링크나 코드를 전달해 주세요.</div>
+
+        <div style="background: #f3f4f6; padding: 12px; border-radius: 8px; margin-bottom: 12px; text-align: left;">
+          <div style="font-size: 0.75rem; color: var(--text-muted);">입장 코드</div>
+          <div style="font-size: 1.4rem; font-weight: 800; letter-spacing: 2px; color: var(--primary);" id="display-invite-code">123456</div>
+        </div>
+
+        <div class="notice-box">상대가 입장하면 자동으로 대국방이 연결됩니다.</div>
+
+        <div style="display: flex; gap: 8px; flex-direction: column;">
+          <button class="btn btn-secondary btn-block" onclick="alert('초대 링크가 복사되었습니다.')">초대 링크 복사</button>
+          <button class="btn btn-success btn-block" onclick="simulateBJoin()">[시뮬레이션] 상대(서연) 입장 완료시키기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. VIEW_ROOM: 대국방 화면 -->
+    <div class="view" id="VIEW_ROOM">
+      <!-- 대국방 헤더 요약 -->
+      <div class="card" style="padding: 10px 14px; margin-bottom: 8px; background: #fafafa;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-weight: 700; font-size: 0.95rem;" id="room-opponent-name">서연</span>
+            <span class="tag tag-active" id="room-status-tag">진행 중</span>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);" id="room-id-tag">방번호 #ROOM-01</div>
+        </div>
+      </div>
+
+      <!-- 무승부 배너 (협상 진행 중일 때만 노출) -->
+      <div id="room-draw-banner" style="display: none;" class="notice-box">
+        🤝 <strong>무승부 제안 진행 중:</strong> <span id="draw-banner-text">상대방의 조건 선택 대기 중</span>
+        <button class="btn btn-sm btn-outline" style="margin-left: 6px; padding: 2px 6px;" onclick="showView('VIEW_NEGOTIATION')">보기</button>
+      </div>
+
+      <!-- 메시지 타임라인 -->
+      <div class="chat-container" id="chat-messages">
+        <!-- JS injected messages -->
+      </div>
+
+      <!-- 대국방 하단 도구 및 초안 입력창 -->
+      <div class="chat-bottom" id="chat-bottom-panel">
+        <div class="chat-tools">
+          <button class="btn btn-sm btn-secondary" onclick="openSheet('SHEET_SITUATION')">📊 형세 파악</button>
+          <button class="btn btn-sm btn-secondary" onclick="openSheet('SHEET_MUNCHEOL')">⚖️ AI 문철</button>
+          <button class="btn btn-sm btn-outline" onclick="openNegotiationFromRoom()">🤝 무승부 제안</button>
+        </div>
+        <div class="chat-input-row">
+          <textarea id="chat-draft-input" class="chat-input" rows="2" placeholder="초안 메시지를 입력하세요... (확인을 누르면 AI 심판이 열립니다)"></textarea>
+          <button class="btn btn-primary" style="height: 100%; min-width: 60px;" onclick="handleConfirmDraft()">확인</button>
+        </div>
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-align: center;">
+          * 초안 작성 후 [확인]을 누르면 AI 심판 시트가 필수 개시됩니다. (직접 전송 불가)
+        </div>
+      </div>
+
+      <!-- 종료된 방 읽기 전용 안내 바 -->
+      <div id="room-closed-banner" style="display: none;" class="warning-box">
+        🔒 합의로 종료된 대국입니다. 새로운 메시지 전송은 제한되며 지난 기록은 읽기 전용입니다.
+      </div>
+    </div>
+
+    <!-- 4. VIEW_NEGOTIATION: 무승부 협상 화면 -->
+    <div class="view" id="VIEW_NEGOTIATION">
+      <div class="section-title">🤝 조건부 무승부 협상</div>
+
+      <!-- 제안자(Proposer) 작성 화면 -->
+      <div id="negotiation-proposer-view" style="display: none;">
+        <div class="card">
+          <div class="card-title">무승부 제안 작성 (제안자)</div>
+
+          <div class="form-group">
+            <label class="form-label">상대 선택 방식</label>
+            <div class="radio-group">
+              <label class="radio-label"><input type="radio" name="neg-choice-type" value="single" checked> 한 개 선택</label>
+              <label class="radio-label"><input type="radio" name="neg-choice-type" value="multi"> 여러 개 선택</label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">협상 조건 항목</label>
+            <div id="proposer-conditions-container">
+              <!-- JS Injected -->
+            </div>
+            <button class="btn btn-sm btn-secondary" onclick="addProposerCondition()">+ 조건 추가</button>
+            <button class="btn btn-sm btn-outline" onclick="clearProposerConditions()">조건 0개로 설정</button>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 14px;">
+            <button class="btn btn-secondary flex-1" style="flex:1;" onclick="showView('VIEW_ROOM')">계속 대국</button>
+            <button class="btn btn-primary flex-1" style="flex:1;" onclick="submitProposal()">제안하기</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 응답자(Responder) 수락/카운터오퍼 화면 -->
+      <div id="negotiation-responder-view" style="display: none;">
+        <div class="card">
+          <div class="card-title" id="responder-title">상대방의 무승부 제안</div>
+          <div class="card-sub" id="responder-sub" style="margin-bottom: 12px;">조건을 선택 후 수락하면 대국이 종료되고 선택된 조건만 미션으로 생성됩니다.</div>
+
+          <div id="responder-conditions-box">
+            <!-- JS Injected checkboxes or 0 condition banner -->
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
+            <button class="btn btn-success btn-block" id="btn-responder-accept" onclick="acceptNegotiation()">선택 후 수락</button>
+            <button class="btn btn-outline btn-block" onclick="openCounterofferModal()">카운터오퍼 메시지 보내기</button>
+            <button class="btn btn-secondary btn-block" onclick="showView('VIEW_ROOM')">계속 대국하기</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. VIEW_MISSION_BOARD: 미션 보드 화면 -->
+    <div class="view" id="VIEW_MISSION_BOARD">
+      <div class="section-title">📌 미션 보드</div>
+
+      <div class="card" style="margin-bottom: 14px; padding: 10px; background: #e0e7ff;">
+        <div style="font-size: 0.82rem; color: var(--primary); font-weight: 600;">
+          💡 미션은 무승부 합의 시 양측 수락에 의해 최종 생성되며, 상대 확인 절차를 통해 완주됩니다.
+        </div>
+      </div>
+
+      <div id="mission-board-list">
+        <!-- JS Injected Missions -->
+      </div>
+    </div>
+
+    <!-- SHEETS & MODALS OVERLAYS -->
+
+    <!-- SHEET: AI 심판 시트 -->
+    <div class="sheet-overlay" id="SHEET_AI_JUDGE">
+      <div class="sheet-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="font-size: 1.1rem; font-weight: 700;">⚖️ AI 심판 결과</div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 0.72rem; color: var(--text-muted);">테스트 분기:</span>
+            <select id="ai-mode-select" class="form-control" style="padding: 2px 6px; font-size: 0.75rem;" onchange="updateAISheetView()">
+              <option value="normal">Normal (전송 가능)</option>
+              <option value="restricted">Restricted (위험 입력)</option>
+            </select>
+            <button class="btn-icon" onclick="closeSheet('SHEET_AI_JUDGE')">✕</button>
+          </div>
+        </div>
+
+        <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 8px;">
+          입력 초안: "<span id="ai-draft-preview" style="font-weight: 600; color: var(--text);"></span>"
+        </div>
+
+        <!-- Normal View -->
+        <div id="ai-sheet-normal">
+          <div class="card" style="background: #fafafa; border-left: 4px solid var(--primary); margin-bottom: 10px;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary);">⚠️ 이 수의 위험 & 숨은 감정 (AI의 추정)</div>
+            <div style="font-size: 0.82rem; margin-top: 4px; color: var(--text-muted);">
+              "직접적인 비난 문구는 감정적 대립을 심화시킬 가능성이 65%입니다. 본심에는 상대방의 인정과 공감을 바라는 서운함이 포함되어 있습니다."
+            </div>
+          </div>
+
+          <div class="section-title" style="font-size: 0.85rem; margin-bottom: 6px;">💡 AI 추천 메시지</div>
+          <div id="ai-recommendations-list">
+            <div class="card" style="padding: 10px; margin-bottom: 6px;">
+              <div style="font-size: 0.85rem; margin-bottom: 6px;">"아까 그 말 때문에 내 마음이 조금 서운했어. 너와 솔직하게 이야기하고 싶어."</div>
+              <button class="btn btn-sm btn-primary btn-block" onclick="sendRecommendedMsg(0)">추천 1 전송</button>
+            </div>
+            <div class="card" style="padding: 10px; margin-bottom: 6px;">
+              <div style="font-size: 0.85rem; margin-bottom: 6px;">"우리가 서로 오해한 부분이 있는 것 같아. 천천히 정리해 볼까?"</div>
+              <button class="btn btn-sm btn-primary btn-block" onclick="sendRecommendedMsg(1)">추천 2 전송</button>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 14px;">
+            <button class="btn btn-secondary flex-1" style="flex:1;" onclick="closeSheet('SHEET_AI_JUDGE')">초안 수정</button>
+            <button class="btn btn-outline flex-1" style="flex:1;" onclick="sendOriginalMsg()">원문 전송</button>
+          </div>
+        </div>
+
+        <!-- Restricted View -->
+        <div id="ai-sheet-restricted" style="display: none;">
+          <div class="warning-box">
+            ⛔ <strong>Restricted AI 분석:</strong><br>
+            이 문장에는 심한 감정적 모욕/위험 표현이 포함되어 AI 심판 추천을 제공할 수 없습니다. 문장을 부드럽게 수정해 다시 확인해 주세요.
+          </div>
+          <button class="btn btn-primary btn-block" onclick="closeSheet('SHEET_AI_JUDGE')">초안 수정하러 가기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHEET: 개인 형세 파악 -->
+    <div class="sheet-overlay" id="SHEET_SITUATION">
+      <div class="sheet-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="font-size: 1.1rem; font-weight: 700;">📊 개인 형세 파악 (비공개)</div>
+          <button class="btn-icon" onclick="closeSheet('SHEET_SITUATION')">✕</button>
+        </div>
+        <div class="notice-box">🔒 본 결과는 요청자 본인에게만 제공되며 상대방에게는 노출되지 않습니다.</div>
+
+        <div class="card" style="margin-bottom: 10px;">
+          <div class="card-title">현재 대화 형세: 교착 상태</div>
+          <div class="card-sub">서로의 요구 사항이 팽팽하여 감정선이 가라앉지 않은 상태입니다.</div>
+        </div>
+
+        <div class="card" style="margin-bottom: 10px;">
+          <div class="card-title">내가 확인할 쟁점 & AI 추정</div>
+          <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
+            - 상대방의 핵심 바람: 감정적 억제 요구가 아닌 인정<br>
+            - 추천 행동: 상대의 말을 먼저 수락한 뒤 내 입장 표현하기
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-block" onclick="closeSheet('SHEET_SITUATION')">대국방으로 돌아가기</button>
+      </div>
+    </div>
+
+    <!-- SHEET: 함께 보는 AI 문철 -->
+    <div class="sheet-overlay" id="SHEET_MUNCHEOL">
+      <div class="sheet-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="font-size: 1.1rem; font-weight: 700;">⚖️ 함께 보는 AI 문철</div>
+          <button class="btn-icon" onclick="closeSheet('SHEET_MUNCHEOL')">✕</button>
+        </div>
+        <div class="notice-box">🤝 두 멤버가 함께 보는 공용 요약 브리핑입니다. 승패를 판정하지 않습니다.</div>
+
+        <div class="card" style="margin-bottom: 10px;">
+          <div class="card-title">함께 확인할 대화 요약</div>
+          <div style="font-size: 0.82rem; color: var(--text-muted);">
+            약속 시간 지연에 따른 오해로 시작되었으며, 양측 모두 상대의 무성의함을 문제로 인식함.
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 10px;">
+          <div class="card-title">서로 다른 지점 & 바람과 걱정 (AI의 추정)</div>
+          <div style="font-size: 0.82rem; color: var(--text-muted);">
+            - 민준: 사전 연락의 의무 강조<br>
+            - 서연: 불가피한 상황에 대한 인내 요구
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 14px;">
+          <button class="btn btn-secondary flex-1" style="flex:1;" onclick="closeSheet('SHEET_MUNCHEOL')">대국방으로</button>
+          <button class="btn btn-primary flex-1" style="flex:1;" onclick="closeSheet('SHEET_MUNCHEOL'); openNegotiationFromRoom();">무승부 제안하기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: 카운터오퍼 작성 -->
+    <div class="sheet-overlay" id="SHEET_COUNTEROFFER">
+      <div class="sheet-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="font-size: 1.05rem; font-weight: 700;">💬 카운터오퍼 메시지 작성</div>
+          <button class="btn-icon" onclick="closeSheet('SHEET_COUNTEROFFER')">✕</button>
+        </div>
+        <div class="notice-box">제안 수정을 요구하는 의견을 메시지로 작성합니다. (제안자가 확인 후 수정)</div>
+        <div class="form-group">
+          <textarea id="counteroffer-msg-input" class="form-control" rows="3" placeholder="예: 조건 1의 주체를 '함께'로 바꿔주면 수락할게!"></textarea>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="sendCounteroffer()">카운터오퍼 전송</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Global Application State (In-Memory Mock State)
+    let state = {
+      currentUser: 'A', // 'A' (민준) or 'B' (서연)
+      viewStack: ['VIEW_MAIN'],
+      room: {
+        id: 'ROOM-01',
+        status: 'active', // 'active' or 'closed'
+        inviteCode: '123456',
+        messages: [
+          { sender: 'B', text: '아까 약속 시간에 늦은 거 너무 서운했어.', isRec: false },
+          { sender: 'A', text: '나도 갑자기 일이 생겨서 어쩔 수 없었어.', isRec: false }
+        ],
+        hasDrawProposal: false,
+        drawProposal: null // proposal object
+      },
+      missions: [
+        {
+          id: 'M-01',
+          title: '오늘 저녁 산책 30분 같이 하기',
+          type: 'personal', // 'personal' or 'joint'
+          performer: 'A', // 민준
+          confirmer: 'B', // 서연
+          status: 'in_progress', // 'in_progress', 'requested', 'completed', 'retry'
+          revision: 1
+        }
+      ]
+    };
+
+    // User Switcher
+    function switchUser(user) {
+      state.currentUser = user;
+      document.getElementById('btn-user-a').classList.toggle('active', user === 'A');
+      document.getElementById('btn-user-b').classList.toggle('active', user === 'B');
+      document.getElementById('header-user-badge').innerText = user === 'A' ? '민준 (A)' : '서연 (B)';
+      renderAll();
+    }
+
+    // View Navigation
+    function showView(viewId) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      const target = document.getElementById(viewId);
+      if (target) target.classList.add('active');
+      
+      const backBtn = document.getElementById('btn-header-back');
+      backBtn.style.visibility = (viewId === 'VIEW_MAIN') ? 'hidden' : 'visible';
+      
+      state.viewStack.push(viewId);
+      renderAll();
+    }
+
+    function navigateBack() {
+      if (state.viewStack.length > 1) {
+        state.viewStack.pop();
+        const prevView = state.viewStack[state.viewStack.length - 1] || 'VIEW_MAIN';
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(prevView).classList.add('active');
+        document.getElementById('btn-header-back').style.visibility = (prevView === 'VIEW_MAIN') ? 'hidden' : 'visible';
+        renderAll();
+      } else {
+        showView('VIEW_MAIN');
+      }
+    }
+
+    function openSheet(sheetId) {
+      document.getElementById(sheetId).classList.add('active');
+    }
+
+    function closeSheet(sheetId) {
+      document.getElementById(sheetId).classList.remove('active');
+    }
+
+    // Render Logic
+    function renderAll() {
+      renderMain();
+      renderRoom();
+      renderNegotiation();
+      renderMissions();
+    }
+
+    // Render Main View
+    function renderMain() {
+      // Missions
+      const mContainer = document.getElementById('main-mission-container');
+      if (state.missions.length === 0) {
+        mContainer.innerHTML = `<div class="card card-sub" style="text-align:center;">진행 중인 미션이 없습니다.</div>`;
+      } else {
+        mContainer.innerHTML = state.missions.map(m => {
+          let badgeTag = '';
+          if (m.status === 'requested') badgeTag = `<span class="tag tag-pending">상대 확인 대기</span>`;
+          else if (m.status === 'in_progress') badgeTag = `<span class="tag tag-active">진행 중</span>`;
+          else if (m.status === 'completed') badgeTag = `<span class="tag tag-closed">완료됨</span>`;
+          
+          return `
+            <div class="card" onclick="showView('VIEW_MISSION_BOARD')" style="cursor:pointer;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="card-title" style="margin-bottom:0;">${m.title}</div>
+                ${badgeTag}
+              </div>
+              <div class="card-sub" style="margin-top:4px;">수행자: ${m.performer === 'A' ? '민준' : '서연'} | 확인자: ${m.confirmer === 'A' ? '민준' : '서연'}</div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Active Game
+      const activeContainer = document.getElementById('main-active-game-container');
+      if (state.room.status === 'active') {
+        const oppName = state.currentUser === 'A' ? '서연 (B)' : '민준 (A)';
+        activeContainer.innerHTML = `
+          <div class="card" style="border-left: 4px solid var(--primary);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <span class="tag tag-active">진행 중 대국</span>
+                <div class="card-title" style="margin-top:4px;">상대: ${oppName}</div>
+              </div>
+              <button class="btn btn-sm btn-primary" onclick="showView('VIEW_ROOM')">대국 재개</button>
+            </div>
+          </div>
+        `;
+      } else {
+        activeContainer.innerHTML = `<div class="card card-sub" style="text-align:center;">진행 중인 대국이 없습니다.</div>`;
+      }
+
+      // Past Games
+      const pastContainer = document.getElementById('main-past-games-container');
+      if (state.room.status === 'closed') {
+        const oppName = state.currentUser === 'A' ? '서연 (B)' : '민준 (A)';
+        pastContainer.innerHTML = `
+          <div class="card" style="background:#fafafa;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <span class="tag tag-closed">종료됨 (읽기 전용)</span>
+                <div class="card-title" style="margin-top:4px;">대국 상대: ${oppName}</div>
+              </div>
+              <button class="btn btn-sm btn-secondary" onclick="showView('VIEW_ROOM')">대국 기록 보기</button>
+            </div>
+          </div>
+        `;
+      } else {
+        pastContainer.innerHTML = '';
+      }
+    }
+
+    // Render Room View
+    function renderRoom() {
+      const oppName = state.currentUser === 'A' ? '서연' : '민준';
+      document.getElementById('room-opponent-name').innerText = oppName;
+
+      const isClosed = state.room.status === 'closed';
+      document.getElementById('room-status-tag').className = isClosed ? 'tag tag-closed' : 'tag tag-active';
+      document.getElementById('room-status-tag').innerText = isClosed ? '종료됨' : '진행 중';
+
+      document.getElementById('chat-bottom-panel').style.display = isClosed ? 'none' : 'flex';
+      document.getElementById('room-closed-banner').style.display = isClosed ? 'block' : 'none';
+
+      // Draw Banner
+      const banner = document.getElementById('room-draw-banner');
+      if (state.room.hasDrawProposal && !isClosed) {
+        banner.style.display = 'block';
+        const isProposer = state.room.drawProposal.proposer === state.currentUser;
+        document.getElementById('draw-banner-text').innerText = isProposer ? '상대방의 수락/카운터오퍼 대기 중' : '상대방의 무승부 제안이 도착했습니다.';
+      } else {
+        banner.style.display = 'none';
+      }
+
+      // Messages
+      const container = document.getElementById('chat-messages');
+      container.innerHTML = state.room.messages.map(m => {
+        const isMe = m.sender === state.currentUser;
+        const senderName = m.sender === 'A' ? '민준' : '서연';
+        return `
+          <div class="msg-bubble ${isMe ? 'msg-right' : 'msg-left'} ${m.isRec ? 'msg-recommended' : ''}">
+            <div class="msg-sender">${senderName} ${m.isRec ? '<span class="msg-badge">AI 추천</span>' : ''}</div>
+            ${m.text}
+          </div>
+        `;
+      }).join('');
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // Chat Draft & AI Judge Flow
+    function handleConfirmDraft() {
+      const input = document.getElementById('chat-draft-input');
+      const val = input.value.trim();
+      if (!val) {
+        alert('초안 메시지를 입력해 주세요.');
+        return;
+      }
+      document.getElementById('ai-draft-preview').innerText = val;
+      openSheet('SHEET_AI_JUDGE');
+    }
+
+    function updateAISheetView() {
+      const mode = document.getElementById('ai-mode-select').value;
+      document.getElementById('ai-sheet-normal').style.display = (mode === 'normal') ? 'block' : 'none';
+      document.getElementById('ai-sheet-restricted').style.display = (mode === 'restricted') ? 'block' : 'none';
+    }
+
+    function sendOriginalMsg() {
+      const val = document.getElementById('chat-draft-input').value.trim();
+      state.room.messages.push({ sender: state.currentUser, text: val, isRec: false });
+      document.getElementById('chat-draft-input').value = '';
+      closeSheet('SHEET_AI_JUDGE');
+      renderRoom();
+    }
+
+    function sendRecommendedMsg(index) {
+      const recs = [
+        "아까 그 말 때문에 내 마음이 조금 서운했어. 너와 솔직하게 이야기하고 싶어.",
+        "우리가 서로 오해한 부분이 있는 것 같아. 천천히 정리해 볼까?"
+      ];
+      state.room.messages.push({ sender: state.currentUser, text: recs[index], isRec: true });
+      document.getElementById('chat-draft-input').value = '';
+      closeSheet('SHEET_AI_JUDGE');
+      renderRoom();
+    }
+
+    // Draw Negotiation Flow
+    function openNegotiationFromRoom() {
+      if (!state.room.hasDrawProposal) {
+        // Init proposal template
+        state.room.drawProposal = {
+          proposer: state.currentUser,
+          choiceType: 'single',
+          conditions: [
+            { text: '오늘 저녁 산책 30분 같이 하기', resp: '함께' },
+            { text: '서로 감사했던 일 한 가지씩 표현하기', resp: '상대' }
+          ]
+        };
+      }
+      showView('VIEW_NEGOTIATION');
+    }
+
+    let proposerTempConditions = [
+      { text: '오늘 저녁 산책 30분 같이 하기', resp: '함께' }
+    ];
+
+    function renderNegotiation() {
+      const pView = document.getElementById('negotiation-proposer-view');
+      const rView = document.getElementById('negotiation-responder-view');
+
+      if (!state.room.hasDrawProposal) {
+        // Proposer Mode
+        pView.style.display = 'block';
+        rView.style.display = 'none';
+        renderProposerForm();
+      } else {
+        const isProposer = state.room.drawProposal.proposer === state.currentUser;
+        if (isProposer) {
+          pView.style.display = 'block';
+          rView.style.display = 'none';
+          renderProposerForm();
+        } else {
+          pView.style.display = 'none';
+          rView.style.display = 'block';
+          renderResponderForm();
+        }
+      }
+    }
+
+    function renderProposerForm() {
+      const container = document.getElementById('proposer-conditions-container');
+      if (proposerTempConditions.length === 0) {
+        container.innerHTML = `<div class="warning-box">합의 조건이 0개입니다. 수락 시 미션 없이 대국이 종료됩니다.</div>`;
+      } else {
+        container.innerHTML = proposerTempConditions.map((c, i) => `
+          <div class="condition-item">
+            <div class="form-group" style="margin-bottom:6px;">
+              <input type="text" class="form-control" value="${c.text}" onchange="proposerTempConditions[${i}].text=this.value">
+            </div>
+            <div style="font-size:0.8rem; display:flex; gap:10px; align-items:center;">
+              <span>책임:</span>
+              <label><input type="radio" name="resp-${i}" value="나" ${c.resp==='나'?'checked':''} onchange="proposerTempConditions[${i}].resp='나'"> 나</label>
+              <label><input type="radio" name="resp-${i}" value="상대" ${c.resp==='상대'?'checked':''} onchange="proposerTempConditions[${i}].resp='상대'"> 상대</label>
+              <label><input type="radio" name="resp-${i}" value="함께" ${c.resp==='함께'?'checked':''} onchange="proposerTempConditions[${i}].resp='함께'"> 함께</label>
+              <button class="btn btn-sm btn-danger" style="margin-left:auto; padding:2px 6px;" onclick="removeProposerCondition(${i})">삭제</button>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    function addProposerCondition() {
+      proposerTempConditions.push({ text: '새로운 약속 실행하기', resp: '함께' });
+      renderProposerForm();
+    }
+
+    function removeProposerCondition(i) {
+      proposerTempConditions.splice(i, 1);
+      renderProposerForm();
+    }
+
+    function clearProposerConditions() {
+      proposerTempConditions = [];
+      renderProposerForm();
+    }
+
+    function submitProposal() {
+      const choiceType = document.querySelector('input[name="neg-choice-type"]:checked').value;
+      state.room.hasDrawProposal = true;
+      state.room.drawProposal = {
+        proposer: state.currentUser,
+        choiceType: choiceType,
+        conditions: [...proposerTempConditions]
+      };
+      alert('무승부 제안이 전달되었습니다. 상대방 시점으로 전환해 수락할 수 있습니다.');
+      showView('VIEW_ROOM');
+    }
+
+    function renderResponderForm() {
+      const prop = state.room.drawProposal;
+      const box = document.getElementById('responder-conditions-box');
+      const btnAccept = document.getElementById('btn-responder-accept');
+
+      if (!prop.conditions || prop.conditions.length === 0) {
+        box.innerHTML = `
+          <div class="notice-box">
+            🤝 <strong>조건 0개 제안:</strong> 합의할 조건이 없습니다. 수락하면 미션 작성 없이 대국방이 종료됩니다.
+          </div>
+        `;
+        btnAccept.innerText = '조건 없이 수락하기';
+      } else {
+        const inputType = prop.choiceType === 'single' ? 'radio' : 'checkbox';
+        box.innerHTML = prop.conditions.map((c, i) => `
+          <div class="condition-item">
+            <label class="checkbox-label" style="font-weight:600;">
+              <input type="${inputType}" name="resp-select" value="${i}">
+              ${c.text}
+            </label>
+            <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px; padding-left:22px;">
+              책임 주체: ${c.resp}
+            </div>
+          </div>
+        `).join('');
+        btnAccept.innerText = '선택 후 수락하기';
+      }
+    }
+
+    function acceptNegotiation() {
+      const prop = state.room.drawProposal;
+      
+      // If has conditions, extract selected
+      if (prop.conditions && prop.conditions.length > 0) {
+        const selected = document.querySelectorAll('input[name="resp-select"]:checked');
+        if (selected.length === 0) {
+          alert('수락할 조건을 하나 이상 선택해 주세요.');
+          return;
+        }
+        selected.forEach(el => {
+          const idx = parseInt(el.value);
+          const cond = prop.conditions[idx];
+          state.missions.push({
+            id: 'M-' + Date.now(),
+            title: cond.text,
+            type: cond.resp === '함께' ? 'joint' : 'personal',
+            performer: cond.resp === '상대' ? prop.proposer : state.currentUser,
+            confirmer: cond.resp === '상대' ? state.currentUser : prop.proposer,
+            status: 'in_progress',
+            revision: 1
+          });
+        });
+      }
+
+      // Close Room and archive
+      state.room.status = 'closed';
+      state.room.hasDrawProposal = false;
+      alert('무승부 협상이 성립되어 대국이 종료되었으며 선택된 조건이 미션으로 생성되었습니다.');
+      showView('VIEW_MAIN');
+    }
+
+    function openCounterofferModal() {
+      openSheet('SHEET_COUNTEROFFER');
+    }
+
+    function sendCounteroffer() {
+      const val = document.getElementById('counteroffer-msg-input').value.trim();
+      if (!val) {
+        alert('카운터오퍼 내용을 입력해 주세요.');
+        return;
+      }
+      state.room.messages.push({
+        sender: state.currentUser,
+        text: `[카운터오퍼 제안]: ${val}`,
+        isRec: false
+      });
+      closeSheet('SHEET_COUNTEROFFER');
+      alert('카운터오퍼 메시지가 대국방에 전송되었습니다. 제안자가 확인 후 제안을 수정할 수 있습니다.');
+      showView('VIEW_ROOM');
+    }
+
+    // Missions Render & Logic
+    function renderMissions() {
+      const container = document.getElementById('mission-board-list');
+      if (state.missions.length === 0) {
+        container.innerHTML = `<div class="card card-sub" style="text-align:center;">생성된 미션이 없습니다.</div>`;
+        return;
+      }
+
+      container.innerHTML = state.missions.map(m => {
+        const isPerformer = m.performer === state.currentUser;
+        const isConfirmer = m.confirmer === state.currentUser;
+
+        let actions = '';
+        if (m.status === 'in_progress') {
+          if (isPerformer) {
+            actions = `<button class="btn btn-sm btn-primary" onclick="updateMissionStatus('${m.id}', 'requested')">완료 요청</button>`;
+          } else {
+            actions = `<span class="tag tag-active">수행자 진행 중</span>`;
+          }
+        } else if (m.status === 'requested') {
+          if (isConfirmer) {
+            actions = `
+              <button class="btn btn-sm btn-success" onclick="updateMissionStatus('${m.id}', 'completed')">수행 확인</button>
+              <button class="btn btn-sm btn-danger" onclick="updateMissionStatus('${m.id}', 'retry')">다시 요청</button>
+            `;
+          } else {
+            actions = `<span class="tag tag-pending">상대 확인 대기</span>`;
+          }
+        } else if (m.status === 'completed') {
+          actions = `<span class="tag tag-closed">완료됨</span>`;
+        } else if (m.status === 'retry') {
+          if (isPerformer) {
+            actions = `<button class="btn btn-sm btn-primary" onclick="updateMissionStatus('${m.id}', 'in_progress')">재수행 시작</button>`;
+          } else {
+            actions = `<span class="tag tag-pending">재수행 대기</span>`;
+          }
+        }
+
+        return `
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+              <div class="card-title">${m.title}</div>
+              <span class="tag tag-active">${m.type === 'joint' ? '공동 퀘스트' : '개인 미션'}</span>
+            </div>
+            <div class="card-sub" style="margin-bottom:10px;">
+              수행자: ${m.performer === 'A' ? '민준' : '서연'} | 확인자: ${m.confirmer === 'A' ? '민준' : '서연'}
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:6px;">
+              ${actions}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateMissionStatus(id, newStatus) {
+      const m = state.missions.find(x => x.id === id);
+      if (m) {
+        m.status = newStatus;
+        renderAll();
+      }
+    }
+
+    // Room Start & Join Simulation
+    function createRoomAsA() {
+      switchUser('A');
+      showView('VIEW_INVITE_WAIT');
+    }
+
+    function simulateBJoin() {
+      alert('상대(서연)가 초대 코드로 입장했습니다!');
+      state.room.status = 'active';
+      showView('VIEW_ROOM');
+    }
+
+    function joinRoomWithCode() {
+      const code = document.getElementById('input-invite-code').value.trim();
+      if (code !== '123456') {
+        alert('유효하지 않은 초대 코드입니다.');
+        return;
+      }
+      switchUser('B');
+      state.room.status = 'active';
+      alert('대국방에 성공적으로 입장했습니다.');
+      showView('VIEW_ROOM');
+    }
+
+    // Preset Scenarios Loader
+    function loadScenario(type) {
+      if (type === 'chat_ai') {
+        showView('VIEW_ROOM');
+      } else if (type === 'draw_cond') {
+        state.room.hasDrawProposal = true;
+        proposerTempConditions = [
+          { text: '오늘 저녁 산책 30분 같이 하기', resp: '함께' },
+          { text: '답장 늦을 때 사전에 이유 알려주기', resp: '상대' }
+        ];
+        submitProposal();
+      } else if (type === 'draw_zero') {
+        state.room.hasDrawProposal = true;
+        proposerTempConditions = [];
+        submitProposal();
+      } else if (type === 'draw_counter') {
+        showView('VIEW_ROOM');
+        openCounterofferModal();
+      } else if (type === 'mission') {
+        showView('VIEW_MISSION_BOARD');
+      } else {
+        showView('VIEW_MAIN');
+      }
+    }
+
+    function resetAllData() {
+      state = {
+        currentUser: 'A',
+        viewStack: ['VIEW_MAIN'],
+        room: {
+          id: 'ROOM-01',
+          status: 'active',
+          inviteCode: '123456',
+          messages: [
+            { sender: 'B', text: '아까 약속 시간에 늦은 거 너무 서운했어.', isRec: false },
+            { sender: 'A', text: '나도 갑자기 일이 생겨서 어쩔 수 없었어.', isRec: false }
+          ],
+          hasDrawProposal: false,
+          drawProposal: null
+        },
+        missions: [
+          {
+            id: 'M-01',
+            title: '오늘 저녁 산책 30분 같이 하기',
+            type: 'personal',
+            performer: 'A',
+            confirmer: 'B',
+            status: 'in_progress',
+            revision: 1
+          }
+        ]
+      };
+      switchUser('A');
+      showView('VIEW_MAIN');
+    }
+
+    // Initial Load
+    renderAll();
+  </script>
+</body>
+</html>
