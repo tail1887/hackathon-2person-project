@@ -281,7 +281,6 @@
         <div class="chat-tools">
           <button class="btn btn-sm btn-secondary" onclick="openSheet('SHEET_SITUATION')">📊 형세 파악</button>
           <button class="btn btn-sm btn-secondary" id="btn-room-review" onclick="requestRoomReview()">⚖️ AI 문철 신청하기</button>
-          <button class="btn btn-sm btn-outline" id="btn-room-review-history" style="display: none;" onclick="openReviewHistory()">🗂 문철 기록</button>
           <button class="btn btn-sm btn-outline" id="btn-negotiation-history" style="display: none;" onclick="openNegotiationHistory()">🗂 협상 기록</button>
           <button class="btn btn-sm btn-outline" onclick="openNegotiationFromRoom()">🤝 무승부 제안</button>
         </div>
@@ -523,6 +522,7 @@
           <button class="btn btn-primary flex-1" style="flex:1;" onclick="closeSheet('SHEET_MUNCHEOL'); openNegotiationFromRoom();">무승부 제안하기</button>
         </div>
         <button class="btn btn-outline btn-block" style="margin-top: 8px;" onclick="requestNewRoomReview()">새 AI 문철 신청하기</button>
+        <button class="btn btn-outline btn-block" id="btn-review-history-in-sheet" style="margin-top: 8px;" onclick="openReviewHistory()">🗂 이전 AI 문철 기록 보기</button>
       </div>
     </div>
 

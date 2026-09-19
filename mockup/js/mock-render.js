@@ -109,7 +109,7 @@ function renderRoom() {
       const reviewText = document.getElementById('room-review-banner-text');
       const reviewBannerBtn = document.getElementById('btn-room-review-banner');
       const reviewBtn = document.getElementById('btn-room-review');
-      const reviewHistoryBtn = document.getElementById('btn-room-review-history');
+      const reviewHistoryBtn = document.getElementById('btn-review-history-in-sheet');
       reviewBanner.style.display = 'none';
       reviewBannerBtn.style.display = 'none';
       reviewHistoryBtn.style.display = state.room.reviewRecords.length ? 'inline-flex' : 'none';
@@ -385,4 +385,3 @@ function renderMissions() {
         `;
       }).join('');
     }
-
