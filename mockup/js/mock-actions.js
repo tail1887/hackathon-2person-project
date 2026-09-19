@@ -7,14 +7,6 @@
       '우리가 서로 오해한 부분이 있는 것 같아. 천천히 정리해 볼까?'
     ];
 
-function switchUser(user) {
-      state.currentUser = user;
-      document.getElementById('btn-user-a').classList.toggle('active', user === 'A');
-      document.getElementById('btn-user-b').classList.toggle('active', user === 'B');
-      document.getElementById('header-user-badge').innerText = user === 'A' ? '민준 (A)' : '서연 (B)';
-      renderAll();
-    }
-
 function showView(viewId) {
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       const target = document.getElementById(viewId);
@@ -331,14 +323,8 @@ function updateMissionStatus(id, newStatus) {
     }
 
 function createRoomAsA() {
-      switchUser('A');
+      setMockUser('A');
       showView('VIEW_INVITE_WAIT');
-    }
-
-function simulateBJoin() {
-      alert('상대(서연)가 초대 코드로 입장했습니다!');
-      state.room.status = 'active';
-      showView('VIEW_ROOM');
     }
 
 function joinRoomWithCode() {
@@ -347,50 +333,10 @@ function joinRoomWithCode() {
         alert('유효하지 않은 초대 코드입니다.');
         return;
       }
-      switchUser('B');
+      setMockUser('B');
       state.room.status = 'active';
       alert('대국방에 성공적으로 입장했습니다.');
       showView('VIEW_ROOM');
-    }
-
-function loadScenario(type) {
-      if (type === 'chat_ai') {
-        showView('VIEW_ROOM');
-      } else if (type === 'draw_cond') {
-        proposerTempConditions = [
-          { text: '오늘 저녁 산책 30분 같이 하기', resp: '함께' },
-          { text: '답장 늦을 때 사전에 이유 알려주기', resp: '상대' }
-        ];
-        submitProposal();
-      } else if (type === 'draw_zero') {
-        proposerTempConditions = [];
-        submitProposal();
-      } else if (type === 'draw_counter') {
-        state.room.hasDrawProposal = false;
-        state.room.drawProposal = null;
-        state.room.editingCounteroffer = false;
-        state.room.negotiationHistory = [];
-        state.currentUser = 'A';
-        proposerTempConditions = [
-          { text: '오늘 저녁 산책 30분 같이 하기', resp: '함께' },
-          { text: '답장 늦을 때 사전에 이유 알려주기', resp: '상대' }
-        ];
-        submitProposal();
-        switchUser('B');
-        showView('VIEW_NEGOTIATION');
-        openCounterofferModal();
-      } else if (type === 'mission') {
-        showView('VIEW_MISSION_BOARD');
-      } else {
-        showView('VIEW_MAIN');
-      }
-    }
-
-function resetAllData() {
-      state = createInitialMockState();
-      resetMockUiState();
-      switchUser('A');
-      showView('VIEW_MAIN');
     }
 
 // 목업 초기 화면
