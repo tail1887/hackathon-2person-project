@@ -764,10 +764,14 @@
           reviewBtn.disabled = true;
           reviewBtn.innerText = '⚖️ AI 문철 준비 중';
         } else if (review.status === 'ready') {
-          reviewText.innerText = 'AI 문철이 준비됐어요. 두 사람이 함께 확인할 수 있어요.';
-          reviewBannerBtn.innerText = '함께 확인하기';
-          reviewBannerBtn.style.display = 'inline-flex';
-          reviewBannerBtn.onclick = openRoomReview;
+          const hasViewedCurrentReview = review.viewedBy?.includes(state.currentUser);
+          reviewBanner.style.display = hasViewedCurrentReview ? 'none' : 'block';
+          if (!hasViewedCurrentReview) {
+            reviewText.innerText = 'AI 문철이 준비됐어요. 두 사람이 함께 확인할 수 있어요.';
+            reviewBannerBtn.innerText = '함께 확인하기';
+            reviewBannerBtn.style.display = 'inline-flex';
+            reviewBannerBtn.onclick = openRoomReview;
+          }
           reviewBtn.innerText = '⚖️ AI 문철 확인하기';
           reviewBtn.onclick = openRoomReview;
         }
@@ -827,14 +831,14 @@
 
     function requestRoomReview() {
       if (state.room.reviewRequest || state.room.status === 'closed') return;
-      state.room.reviewRequest = { requester: state.currentUser, status: 'pending' };
+      state.room.reviewRequest = { requester: state.currentUser, status: 'pending', viewedBy: [] };
       renderAll();
     }
 
     function requestNewRoomReview() {
       if (state.room.reviewRequest?.status !== 'ready') return;
       closeSheet('SHEET_MUNCHEOL');
-      state.room.reviewRequest = { requester: state.currentUser, status: 'pending' };
+      state.room.reviewRequest = { requester: state.currentUser, status: 'pending', viewedBy: [] };
       renderAll();
     }
 
@@ -859,7 +863,12 @@
     }
 
     function openRoomReview() {
-      if (state.room.reviewRequest?.status === 'ready') openReviewRecord(state.room.reviewRequest.recordId, true);
+      const review = state.room.reviewRequest;
+      if (!review || review.status !== 'ready') return;
+      review.viewedBy = review.viewedBy || [];
+      if (!review.viewedBy.includes(state.currentUser)) review.viewedBy.push(state.currentUser);
+      renderAll();
+      openReviewRecord(review.recordId, true);
     }
 
     function openReviewHistory() {
