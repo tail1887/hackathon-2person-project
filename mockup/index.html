@@ -293,6 +293,11 @@
         🔒 합의로 종료된 대국입니다. 새로운 메시지 전송은 제한되며 지난 기록은 읽기 전용입니다.
         <button class="btn btn-sm btn-outline" style="margin-left: 6px; padding: 2px 6px;" onclick="openNegotiationHistory()">무승부 협상 기록 보기</button>
       </div>
+
+      <div id="room-closed-review-records" style="display: none; margin-top: 12px;">
+        <div class="section-title">⚖️ AI 문철 기록</div>
+        <div id="room-closed-review-record-list"></div>
+      </div>
     </div>
 
     <!-- 4. VIEW_NEGOTIATION: 무승부 협상 화면 -->
@@ -717,6 +722,13 @@
       document.getElementById('chat-bottom-panel').style.display = isClosed ? 'none' : 'flex';
       document.getElementById('room-closed-banner').style.display = isClosed ? 'block' : 'none';
       document.getElementById('btn-negotiation-history').style.display = state.room.negotiationHistory.length ? 'inline-flex' : 'none';
+      const sharedReviewRecords = state.room.reviewRecords.filter(record => record.viewedBy?.length === 2);
+      const closedReviewRecords = document.getElementById('room-closed-review-records');
+      closedReviewRecords.style.display = isClosed && sharedReviewRecords.length ? 'block' : 'none';
+      document.getElementById('room-closed-review-record-list').innerHTML = sharedReviewRecords.map((record, index) => {
+        const requester = record.requester === 'A' ? '민준' : '서연';
+        return `<div class="card"><div class="card-title">함께 확인한 문철 ${sharedReviewRecords.length - index}</div><div class="card-sub">${requester} 신청 · ${record.createdAt} · 읽기 전용</div><button class="btn btn-sm btn-outline" style="margin-top:10px;" onclick="openReviewRecord('${record.id}', false)">문철 보기</button></div>`;
+      }).join('');
 
       // Draw Banner
       const banner = document.getElementById('room-draw-banner');
@@ -745,7 +757,7 @@
       reviewBtn.onclick = requestRoomReview;
       reviewBtn.innerText = '⚖️ AI 문철 신청하기';
 
-      if (review) {
+      if (review && !isClosed) {
         reviewBanner.style.display = 'block';
         if (review.status === 'pending') {
           if (review.requester === state.currentUser) {
@@ -854,7 +866,8 @@
           state.room.reviewRecords.unshift({
             id: review.recordId,
             requester: review.requester,
-            createdAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+            createdAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+            viewedBy: []
           });
           renderAll();
           showToast('AI 문철이 준비됐어요. 대국방의 AI 문철 확인하기를 눌러 함께 확인해 보세요.');
@@ -867,6 +880,11 @@
       if (!review || review.status !== 'ready') return;
       review.viewedBy = review.viewedBy || [];
       if (!review.viewedBy.includes(state.currentUser)) review.viewedBy.push(state.currentUser);
+      const record = state.room.reviewRecords.find(item => item.id === review.recordId);
+      if (record) {
+        record.viewedBy = record.viewedBy || [];
+        if (!record.viewedBy.includes(state.currentUser)) record.viewedBy.push(state.currentUser);
+      }
       renderAll();
       openReviewRecord(review.recordId, true);
     }
