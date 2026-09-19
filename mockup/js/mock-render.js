@@ -344,9 +344,20 @@ function renderMissions() {
       container.innerHTML = state.missions.map(m => {
         const isPerformer = m.performer === state.currentUser;
         const isConfirmer = m.confirmer === state.currentUser;
+        const isJoint = m.type === 'joint';
+        const participants = m.participants || [];
+        const completedBy = m.completedBy || [];
 
         let actions = '';
-        if (m.status === 'in_progress') {
+        if (isJoint) {
+          if (m.status === 'completed') {
+            actions = `<span class="tag tag-closed">두 사람 완료</span>`;
+          } else if (completedBy.includes(state.currentUser)) {
+            actions = `<span class="tag tag-pending">상대 완료 대기</span>`;
+          } else {
+            actions = `<button class="btn btn-sm btn-primary" onclick="updateMissionStatus('${m.id}', 'joint_checkin')">공동 완료 표시</button>`;
+          }
+        } else if (m.status === 'in_progress') {
           if (isPerformer) {
             actions = `<button class="btn btn-sm btn-primary" onclick="updateMissionStatus('${m.id}', 'requested')">완료 요청</button>`;
           } else {
@@ -378,7 +389,9 @@ function renderMissions() {
               <span class="tag tag-active">${m.type === 'joint' ? '공동 퀘스트' : '개인 미션'}</span>
             </div>
             <div class="card-sub" style="margin-bottom:10px;">
-              수행자: ${m.performer === 'A' ? '민준' : '서연'} | 확인자: ${m.confirmer === 'A' ? '민준' : '서연'}
+              ${isJoint
+                ? `참여자: ${participants.map(user => user === 'A' ? '민준' : '서연').join(' · ')} | 완료: ${completedBy.length}/2`
+                : `수행자: ${m.performer === 'A' ? '민준' : '서연'} | 확인자: ${m.confirmer === 'A' ? '민준' : '서연'}`}
             </div>
             <div style="display:flex; justify-content:flex-end; gap:6px;">
               ${actions}

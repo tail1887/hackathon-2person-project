@@ -314,10 +314,20 @@ function openNegotiationHistory() {
 
 function updateMissionStatus(id, newStatus) {
       const m = state.missions.find(x => x.id === id);
-      if (m) {
-        m.status = newStatus;
+      if (!m) return;
+
+      if (m.type === 'joint' && newStatus === 'joint_checkin') {
+        const participants = m.participants || [];
+        if (!participants.includes(state.currentUser)) return;
+        m.completedBy = m.completedBy || [];
+        if (!m.completedBy.includes(state.currentUser)) m.completedBy.push(state.currentUser);
+        if (participants.every(user => m.completedBy.includes(user))) m.status = 'completed';
         renderAll();
+        return;
       }
+
+      m.status = newStatus;
+      renderAll();
     }
 
 function createRoomAsA() {

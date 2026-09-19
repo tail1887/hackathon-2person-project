@@ -26,10 +26,22 @@ const MockDomain = {
   },
 
   createMission({ condition, proposer, accepter }) {
+    if (condition.resp === '함께') {
+      return {
+        id: `M-${Date.now()}`,
+        title: condition.text,
+        type: 'joint',
+        participants: [proposer, accepter],
+        completedBy: [],
+        status: 'in_progress',
+        revision: 1
+      };
+    }
+
     return {
       id: `M-${Date.now()}`,
       title: condition.text,
-      type: condition.resp === '함께' ? 'joint' : 'personal',
+      type: 'personal',
       performer: condition.resp === '나' ? proposer : accepter,
       confirmer: condition.resp === '나' ? accepter : proposer,
       status: 'in_progress',
