@@ -15,6 +15,7 @@ function createInitialMockState() {
       hasDrawProposal: false,
       drawProposal: null,
       negotiationHistory: [],
+      editingCounteroffer: false,
       reviewRequest: null,
       reviewRecords: []
     },
