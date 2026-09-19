@@ -276,6 +276,7 @@
           <button class="btn btn-sm btn-secondary" onclick="openSheet('SHEET_SITUATION')">📊 형세 파악</button>
           <button class="btn btn-sm btn-secondary" id="btn-room-review" onclick="requestRoomReview()">⚖️ AI 문철 신청하기</button>
           <button class="btn btn-sm btn-outline" id="btn-room-review-history" style="display: none;" onclick="openReviewHistory()">🗂 문철 기록</button>
+          <button class="btn btn-sm btn-outline" id="btn-negotiation-history" style="display: none;" onclick="openNegotiationHistory()">🗂 협상 기록</button>
           <button class="btn btn-sm btn-outline" onclick="openNegotiationFromRoom()">🤝 무승부 제안</button>
         </div>
         <div class="chat-input-row">
@@ -290,6 +291,7 @@
       <!-- 종료된 방 읽기 전용 안내 바 -->
       <div id="room-closed-banner" style="display: none;" class="warning-box">
         🔒 합의로 종료된 대국입니다. 새로운 메시지 전송은 제한되며 지난 기록은 읽기 전용입니다.
+        <button class="btn btn-sm btn-outline" style="margin-left: 6px; padding: 2px 6px;" onclick="openNegotiationHistory()">무승부 협상 기록 보기</button>
       </div>
     </div>
 
@@ -326,6 +328,25 @@
         </div>
       </div>
 
+      <!-- 제안자 발송 대기/카운터오퍼 수신 화면 -->
+      <div id="negotiation-proposer-status-view" style="display: none;">
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; gap:8px; align-items:flex-start;">
+            <div>
+              <div class="card-title" id="proposer-status-title">내가 보낸 무승부 제안</div>
+              <div class="card-sub" id="proposer-status-description"></div>
+            </div>
+            <span class="tag tag-pending" id="proposer-status-tag">응답 대기</span>
+          </div>
+          <div id="proposer-status-conditions" style="margin-top:12px;"></div>
+          <div id="proposer-counteroffer-box" style="display:none; margin-top:12px;"></div>
+          <div style="display:flex; gap:8px; margin-top:14px;">
+            <button class="btn btn-outline flex-1" style="flex:1;" onclick="openNegotiationHistory()">무승부 협상 기록 보기</button>
+            <button class="btn btn-primary flex-1" id="btn-edit-counteroffer" style="display:none; flex:1;" onclick="beginCounterofferRevision()">수정하기</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 응답자(Responder) 수락/카운터오퍼 화면 -->
       <div id="negotiation-responder-view" style="display: none;">
         <div class="card">
@@ -339,7 +360,7 @@
           <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
             <button class="btn btn-success btn-block" id="btn-responder-accept" onclick="acceptNegotiation()">선택 후 수락</button>
             <button class="btn btn-outline btn-block" onclick="openCounterofferModal()">카운터오퍼 메시지 보내기</button>
-            <button class="btn btn-secondary btn-block" onclick="showView('VIEW_ROOM')">계속 대국하기</button>
+            <button class="btn btn-secondary btn-block" onclick="cancelNegotiation()">계속 대국하기</button>
           </div>
         </div>
       </div>
@@ -505,6 +526,18 @@
       </div>
     </div>
 
+    <!-- MODAL: 무승부 협상 기록 -->
+    <div class="sheet-overlay" id="SHEET_NEGOTIATION_HISTORY">
+      <div class="sheet-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="font-size: 1.05rem; font-weight: 700;">🗂 무승부 협상 기록</div>
+          <button class="btn-icon" onclick="closeSheet('SHEET_NEGOTIATION_HISTORY')">✕</button>
+        </div>
+        <div class="notice-box" style="margin-bottom:12px;">제안·카운터오퍼·수락·종료·합의 결과를 읽기 전용으로 확인합니다.</div>
+        <div id="negotiation-history-list"></div>
+      </div>
+    </div>
+
   </div>
 
   <script>
@@ -522,6 +555,8 @@
         ],
         hasDrawProposal: false,
         drawProposal: null, // proposal object
+        negotiationHistory: [],
+        editingCounteroffer: false,
         reviewRequest: null, // { requester: 'A'|'B', status: 'pending'|'loading'|'ready', recordId? }
         reviewRecords: []
       },
@@ -586,6 +621,7 @@
       renderMain();
       renderRoom();
       renderNegotiation();
+      renderNegotiationHistory();
       renderMissions();
     }
 
@@ -664,13 +700,17 @@
 
       document.getElementById('chat-bottom-panel').style.display = isClosed ? 'none' : 'flex';
       document.getElementById('room-closed-banner').style.display = isClosed ? 'block' : 'none';
+      document.getElementById('btn-negotiation-history').style.display = state.room.negotiationHistory.length ? 'inline-flex' : 'none';
 
       // Draw Banner
       const banner = document.getElementById('room-draw-banner');
       if (state.room.hasDrawProposal && !isClosed) {
         banner.style.display = 'block';
         const isProposer = state.room.drawProposal.proposer === state.currentUser;
-        document.getElementById('draw-banner-text').innerText = isProposer ? '상대방의 수락/카운터오퍼 대기 중' : '상대방의 무승부 제안이 도착했습니다.';
+        const hasCounteroffer = Boolean(state.room.drawProposal.counteroffer);
+        document.getElementById('draw-banner-text').innerText = isProposer
+          ? (hasCounteroffer ? '카운터오퍼가 도착했습니다. 제안을 수정할 수 있습니다.' : '상대방의 수락/카운터오퍼 대기 중')
+          : '상대방의 무승부 제안이 도착했습니다.';
       } else {
         banner.style.display = 'none';
       }
@@ -840,15 +880,12 @@
     // Draw Negotiation Flow
     function openNegotiationFromRoom() {
       if (!state.room.hasDrawProposal) {
-        // Init proposal template
-        state.room.drawProposal = {
-          proposer: state.currentUser,
-          choiceType: 'single',
-          conditions: [
-            { text: '오늘 저녁 산책 30분 같이 하기', resp: '함께' },
-            { text: '서로 감사했던 일 한 가지씩 표현하기', resp: '상대' }
-          ]
-        };
+        state.room.drawProposal = null;
+        state.room.editingCounteroffer = false;
+        proposerTempConditions = [
+          { text: '오늘 저녁 산책 30분 같이 하기', resp: '함께' },
+          { text: '서로 감사했던 일 한 가지씩 표현하기', resp: '상대' }
+        ];
       }
       showView('VIEW_NEGOTIATION');
     }
@@ -859,25 +896,69 @@
 
     function renderNegotiation() {
       const pView = document.getElementById('negotiation-proposer-view');
+      const pStatusView = document.getElementById('negotiation-proposer-status-view');
       const rView = document.getElementById('negotiation-responder-view');
 
       if (!state.room.hasDrawProposal) {
-        // Proposer Mode
         pView.style.display = 'block';
+        pStatusView.style.display = 'none';
         rView.style.display = 'none';
         renderProposerForm();
       } else {
         const isProposer = state.room.drawProposal.proposer === state.currentUser;
         if (isProposer) {
-          pView.style.display = 'block';
+          if (state.room.editingCounteroffer) {
+            pView.style.display = 'block';
+            pStatusView.style.display = 'none';
+            renderProposerForm();
+          } else {
+            pView.style.display = 'none';
+            pStatusView.style.display = 'block';
+            renderProposerStatus();
+          }
           rView.style.display = 'none';
-          renderProposerForm();
         } else {
           pView.style.display = 'none';
+          pStatusView.style.display = 'none';
           rView.style.display = 'block';
           renderResponderForm();
         }
       }
+    }
+
+    function renderProposerStatus() {
+      const prop = state.room.drawProposal;
+      const hasCounteroffer = Boolean(prop.counteroffer);
+      document.getElementById('proposer-status-description').innerText = hasCounteroffer
+        ? '상대의 카운터오퍼를 확인했습니다. 아래 요청을 참고해 새 제안을 작성할 수 있습니다.'
+        : '상대가 수락·계속 대국·카운터오퍼 중 하나로 응답할 때까지 수정하거나 재발송할 수 없습니다.';
+      document.getElementById('proposer-status-tag').innerText = hasCounteroffer ? '카운터오퍼 도착' : '상대 응답 대기';
+      document.getElementById('proposer-status-conditions').innerHTML = renderReadOnlyConditions(prop.conditions);
+      const counterBox = document.getElementById('proposer-counteroffer-box');
+      counterBox.style.display = hasCounteroffer ? 'block' : 'none';
+      if (hasCounteroffer) {
+        const name = prop.counteroffer.author === 'A' ? '민준' : '서연';
+        counterBox.innerHTML = `<div class="notice-box"><strong>${name}의 카운터오퍼</strong><br>${escapeHtml(prop.counteroffer.body)}</div>`;
+      }
+      document.getElementById('btn-edit-counteroffer').style.display = hasCounteroffer ? 'inline-flex' : 'none';
+    }
+
+    function renderReadOnlyConditions(conditions) {
+      if (!conditions || conditions.length === 0) {
+        return `<div class="notice-box">조건 없이 합의하는 제안입니다. 수락하면 미션 없이 대국이 종료됩니다.</div>`;
+      }
+      return conditions.map((condition, index) => `
+        <div class="condition-item">
+          <strong>조건 ${index + 1}</strong> · ${escapeHtml(condition.text)}
+          <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">책임 주체: ${condition.resp}</div>
+        </div>
+      `).join('');
+    }
+
+    function escapeHtml(value) {
+      const element = document.createElement('div');
+      element.innerText = value || '';
+      return element.innerHTML;
     }
 
     function renderProposerForm() {
@@ -918,15 +999,36 @@
     }
 
     function submitProposal() {
+      if (state.room.hasDrawProposal && !state.room.editingCounteroffer) {
+        alert('상대 응답 전에는 보낸 제안을 수정하거나 재발송할 수 없습니다.');
+        return;
+      }
       const choiceType = document.querySelector('input[name="neg-choice-type"]:checked').value;
-      state.room.hasDrawProposal = true;
-      state.room.drawProposal = {
+      const previousProposal = state.room.drawProposal;
+      const revision = previousProposal ? previousProposal.revision + 1 : 1;
+      const proposal = {
+        revision,
         proposer: state.currentUser,
-        choiceType: choiceType,
-        conditions: [...proposerTempConditions]
+        choiceType,
+        conditions: proposerTempConditions.map(condition => ({ ...condition })),
+        status: 'open',
+        counteroffer: null
       };
+      state.room.hasDrawProposal = true;
+      state.room.drawProposal = proposal;
+      state.room.editingCounteroffer = false;
+      state.room.negotiationHistory.push({ type: 'proposal', proposal: { ...proposal, conditions: proposal.conditions.map(condition => ({ ...condition })) } });
       alert('무승부 제안이 전달되었습니다. 상대방 시점으로 전환해 수락할 수 있습니다.');
       showView('VIEW_ROOM');
+    }
+
+    function beginCounterofferRevision() {
+      const prop = state.room.drawProposal;
+      if (!prop || !prop.counteroffer || prop.proposer !== state.currentUser) return;
+      proposerTempConditions = prop.conditions.map(condition => ({ ...condition }));
+      document.querySelector(`input[name="neg-choice-type"][value="${prop.choiceType}"]`).checked = true;
+      state.room.editingCounteroffer = true;
+      renderAll();
     }
 
     function renderResponderForm() {
@@ -984,8 +1086,11 @@
       }
 
       // Close Room and archive
+      state.room.negotiationHistory.push({ type: 'accepted', revision: prop.revision, accepter: state.currentUser });
       state.room.status = 'closed';
       state.room.hasDrawProposal = false;
+      state.room.drawProposal = null;
+      state.room.editingCounteroffer = false;
       alert('무승부 협상이 성립되어 대국이 종료되었으며 선택된 조건이 미션으로 생성되었습니다.');
       showView('VIEW_MAIN');
     }
@@ -1000,14 +1105,56 @@
         alert('카운터오퍼 내용을 입력해 주세요.');
         return;
       }
+      const prop = state.room.drawProposal;
+      if (!prop || prop.proposer === state.currentUser) return;
       state.room.messages.push({
         sender: state.currentUser,
         text: `[카운터오퍼 제안]: ${val}`,
         isRec: false
       });
+      prop.status = 'counter_requested';
+      prop.counteroffer = { author: state.currentUser, body: val };
+      state.room.negotiationHistory.push({ type: 'counteroffer', revision: prop.revision, author: state.currentUser, body: val });
       closeSheet('SHEET_COUNTEROFFER');
+      document.getElementById('counteroffer-msg-input').value = '';
       alert('카운터오퍼 메시지가 대국방에 전송되었습니다. 제안자가 확인 후 제안을 수정할 수 있습니다.');
       showView('VIEW_ROOM');
+    }
+
+    function cancelNegotiation() {
+      const prop = state.room.drawProposal;
+      if (!prop) return;
+      state.room.negotiationHistory.push({ type: 'cancelled', revision: prop.revision, actor: state.currentUser });
+      state.room.hasDrawProposal = false;
+      state.room.drawProposal = null;
+      state.room.editingCounteroffer = false;
+      alert('무승부 협상을 종료하고 대국을 계속합니다.');
+      showView('VIEW_ROOM');
+    }
+
+    function openNegotiationHistory() {
+      renderNegotiationHistory();
+      openSheet('SHEET_NEGOTIATION_HISTORY');
+    }
+
+    function renderNegotiationHistory() {
+      const container = document.getElementById('negotiation-history-list');
+      if (!state.room.negotiationHistory.length) {
+        container.innerHTML = `<div class="card card-sub" style="text-align:center;">아직 남은 무승부 협상 기록이 없습니다.</div>`;
+        return;
+      }
+      container.innerHTML = state.room.negotiationHistory.map(entry => {
+        if (entry.type === 'proposal') {
+          const name = entry.proposal.proposer === 'A' ? '민준' : '서연';
+          return `<div class="card"><div class="card-title">제안 v${entry.proposal.revision} · ${name}</div>${renderReadOnlyConditions(entry.proposal.conditions)}</div>`;
+        }
+        if (entry.type === 'counteroffer') {
+          const name = entry.author === 'A' ? '민준' : '서연';
+          return `<div class="card" style="border-left:4px solid var(--warning);"><div class="card-title">카운터오퍼 · ${name}</div><div class="card-sub">${escapeHtml(entry.body)}</div></div>`;
+        }
+        if (entry.type === 'accepted') return `<div class="notice-box">제안 v${entry.revision} 수락 · 무승부 합의</div>`;
+        return `<div class="warning-box">제안 v${entry.revision} 종료 · 계속 대국</div>`;
+      }).join('');
     }
 
     // Missions Render & Logic
@@ -1102,18 +1249,27 @@
       if (type === 'chat_ai') {
         showView('VIEW_ROOM');
       } else if (type === 'draw_cond') {
-        state.room.hasDrawProposal = true;
         proposerTempConditions = [
           { text: '오늘 저녁 산책 30분 같이 하기', resp: '함께' },
           { text: '답장 늦을 때 사전에 이유 알려주기', resp: '상대' }
         ];
         submitProposal();
       } else if (type === 'draw_zero') {
-        state.room.hasDrawProposal = true;
         proposerTempConditions = [];
         submitProposal();
       } else if (type === 'draw_counter') {
-        showView('VIEW_ROOM');
+        state.room.hasDrawProposal = false;
+        state.room.drawProposal = null;
+        state.room.editingCounteroffer = false;
+        state.room.negotiationHistory = [];
+        state.currentUser = 'A';
+        proposerTempConditions = [
+          { text: '오늘 저녁 산책 30분 같이 하기', resp: '함께' },
+          { text: '답장 늦을 때 사전에 이유 알려주기', resp: '상대' }
+        ];
+        submitProposal();
+        switchUser('B');
+        showView('VIEW_NEGOTIATION');
         openCounterofferModal();
       } else if (type === 'mission') {
         showView('VIEW_MISSION_BOARD');
@@ -1136,6 +1292,8 @@
           ],
           hasDrawProposal: false,
           drawProposal: null,
+          negotiationHistory: [],
+          editingCounteroffer: false,
           reviewRequest: null,
           reviewRecords: []
         },
