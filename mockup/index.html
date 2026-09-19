@@ -131,6 +131,7 @@
 
     .notice-box { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; border-radius: 8px; padding: 10px 12px; font-size: 0.82rem; margin-bottom: 12px; }
     .warning-box { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 8px; padding: 10px 12px; font-size: 0.82rem; margin-bottom: 12px; }
+    .toast { position: fixed; left: 50%; bottom: 24px; z-index: 1200; max-width: min(420px, calc(100vw - 32px)); padding: 12px 16px; border-radius: 10px; background: #1e1b4b; color: white; box-shadow: 0 10px 24px rgba(0,0,0,.22); font-size: .85rem; transform: translateX(-50%); }
   </style>
 </head>
 <body>
@@ -258,6 +259,12 @@
         <button class="btn btn-sm btn-outline" style="margin-left: 6px; padding: 2px 6px;" onclick="showView('VIEW_NEGOTIATION')">보기</button>
       </div>
 
+      <!-- AI 문철 신청·수락·로딩 안내 -->
+      <div id="room-review-banner" style="display: none;" class="notice-box">
+        <span id="room-review-banner-text"></span>
+        <button id="btn-room-review-banner" class="btn btn-sm btn-primary" style="display: none; margin-left: 6px; padding: 2px 6px;"></button>
+      </div>
+
       <!-- 메시지 타임라인 -->
       <div class="chat-container" id="chat-messages">
         <!-- JS injected messages -->
@@ -267,7 +274,8 @@
       <div class="chat-bottom" id="chat-bottom-panel">
         <div class="chat-tools">
           <button class="btn btn-sm btn-secondary" onclick="openSheet('SHEET_SITUATION')">📊 형세 파악</button>
-          <button class="btn btn-sm btn-secondary" onclick="openSheet('SHEET_MUNCHEOL')">⚖️ AI 문철</button>
+          <button class="btn btn-sm btn-secondary" id="btn-room-review" onclick="requestRoomReview()">⚖️ AI 문철 신청하기</button>
+          <button class="btn btn-sm btn-outline" id="btn-room-review-history" style="display: none;" onclick="openReviewHistory()">🗂 문철 기록</button>
           <button class="btn btn-sm btn-outline" onclick="openNegotiationFromRoom()">🤝 무승부 제안</button>
         </div>
         <div class="chat-input-row">
@@ -437,14 +445,15 @@
       </div>
     </div>
 
-    <!-- SHEET: 함께 보는 AI 문철 -->
+    <!-- SHEET: 상대 수락 뒤 함께 보는 AI 문철 -->
     <div class="sheet-overlay" id="SHEET_MUNCHEOL">
       <div class="sheet-content">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <div style="font-size: 1.1rem; font-weight: 700;">⚖️ 함께 보는 AI 문철</div>
           <button class="btn-icon" onclick="closeSheet('SHEET_MUNCHEOL')">✕</button>
         </div>
-        <div class="notice-box">🤝 두 멤버가 함께 보는 공용 요약 브리핑입니다. 승패를 판정하지 않습니다.</div>
+        <div class="notice-box">🤝 상대 수락 뒤 생성된, 두 멤버가 함께 보는 공용 요약 브리핑입니다. 승패를 판정하지 않습니다.</div>
+        <div id="review-result-context" class="card-sub" style="margin-bottom: 10px;"></div>
 
         <div class="card" style="margin-bottom: 10px;">
           <div class="card-title">함께 확인할 대화 요약</div>
@@ -465,6 +474,19 @@
           <button class="btn btn-secondary flex-1" style="flex:1;" onclick="closeSheet('SHEET_MUNCHEOL')">대국방으로</button>
           <button class="btn btn-primary flex-1" style="flex:1;" onclick="closeSheet('SHEET_MUNCHEOL'); openNegotiationFromRoom();">무승부 제안하기</button>
         </div>
+        <button class="btn btn-outline btn-block" style="margin-top: 8px;" onclick="requestNewRoomReview()">새 AI 문철 신청하기</button>
+      </div>
+    </div>
+
+    <!-- SHEET: 이전 AI 문철 기록 -->
+    <div class="sheet-overlay" id="SHEET_MUNCHEOL_HISTORY">
+      <div class="sheet-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="font-size: 1.1rem; font-weight: 700;">🗂 AI 문철 기록</div>
+          <button class="btn-icon" onclick="closeSheet('SHEET_MUNCHEOL_HISTORY')">✕</button>
+        </div>
+        <div class="notice-box">이전 문철은 읽기 전용입니다. 새 대화를 정리하려면 현재 문철 아래에서 새 신청을 시작하세요.</div>
+        <div id="review-history-list"></div>
       </div>
     </div>
 
@@ -499,7 +521,9 @@
           { sender: 'A', text: '나도 갑자기 일이 생겨서 어쩔 수 없었어.', isRec: false }
         ],
         hasDrawProposal: false,
-        drawProposal: null // proposal object
+        drawProposal: null, // proposal object
+        reviewRequest: null, // { requester: 'A'|'B', status: 'pending'|'loading'|'ready', recordId? }
+        reviewRecords: []
       },
       missions: [
         {
@@ -651,6 +675,48 @@
         banner.style.display = 'none';
       }
 
+      // AI 문철은 신청자·상대의 명시적 동의 뒤에만 생성한다.
+      const review = state.room.reviewRequest;
+      const reviewBanner = document.getElementById('room-review-banner');
+      const reviewText = document.getElementById('room-review-banner-text');
+      const reviewBannerBtn = document.getElementById('btn-room-review-banner');
+      const reviewBtn = document.getElementById('btn-room-review');
+      const reviewHistoryBtn = document.getElementById('btn-room-review-history');
+      reviewBanner.style.display = 'none';
+      reviewBannerBtn.style.display = 'none';
+      reviewHistoryBtn.style.display = state.room.reviewRecords.length ? 'inline-flex' : 'none';
+      reviewBtn.disabled = false;
+      reviewBtn.onclick = requestRoomReview;
+      reviewBtn.innerText = '⚖️ AI 문철 신청하기';
+
+      if (review) {
+        reviewBanner.style.display = 'block';
+        if (review.status === 'pending') {
+          if (review.requester === state.currentUser) {
+            reviewText.innerText = 'AI 문철 신청을 보냈어요. 상대의 수락을 기다리고 있어요.';
+          } else {
+            const requesterName = review.requester === 'A' ? '민준' : '서연';
+            reviewText.innerText = `${requesterName}님이 AI 문철을 신청했습니다. 함께 대화를 정리해 볼까요?`;
+            reviewBannerBtn.innerText = '동의하고 시작';
+            reviewBannerBtn.style.display = 'inline-flex';
+            reviewBannerBtn.onclick = acceptRoomReview;
+          }
+          reviewBtn.disabled = true;
+          reviewBtn.innerText = '⚖️ AI 문철 수락 대기 중';
+        } else if (review.status === 'loading') {
+          reviewText.innerText = 'AI 문철을 준비하고 있어요. 두 사람의 대화를 함께 정리하는 중이에요.';
+          reviewBtn.disabled = true;
+          reviewBtn.innerText = '⚖️ AI 문철 준비 중';
+        } else if (review.status === 'ready') {
+          reviewText.innerText = 'AI 문철이 준비됐어요. 두 사람이 함께 확인할 수 있어요.';
+          reviewBannerBtn.innerText = '함께 확인하기';
+          reviewBannerBtn.style.display = 'inline-flex';
+          reviewBannerBtn.onclick = openRoomReview;
+          reviewBtn.innerText = '⚖️ AI 문철 확인하기';
+          reviewBtn.onclick = openRoomReview;
+        }
+      }
+
       // Messages
       const container = document.getElementById('chat-messages');
       container.innerHTML = state.room.messages.map(m => {
@@ -701,6 +767,74 @@
       document.getElementById('chat-draft-input').value = '';
       closeSheet('SHEET_AI_JUDGE');
       renderRoom();
+    }
+
+    function requestRoomReview() {
+      if (state.room.reviewRequest || state.room.status === 'closed') return;
+      state.room.reviewRequest = { requester: state.currentUser, status: 'pending' };
+      renderAll();
+    }
+
+    function requestNewRoomReview() {
+      if (state.room.reviewRequest?.status !== 'ready') return;
+      closeSheet('SHEET_MUNCHEOL');
+      state.room.reviewRequest = { requester: state.currentUser, status: 'pending' };
+      renderAll();
+    }
+
+    function acceptRoomReview() {
+      const review = state.room.reviewRequest;
+      if (!review || review.status !== 'pending' || review.requester === state.currentUser) return;
+      review.status = 'loading';
+      renderAll();
+      window.setTimeout(() => {
+        if (state.room.reviewRequest === review && review.status === 'loading') {
+          review.status = 'ready';
+          review.recordId = `REVIEW-${Date.now()}`;
+          state.room.reviewRecords.unshift({
+            id: review.recordId,
+            requester: review.requester,
+            createdAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+          });
+          renderAll();
+          showToast('AI 문철이 준비됐어요. 대국방의 AI 문철 확인하기를 눌러 함께 확인해 보세요.');
+        }
+      }, 900);
+    }
+
+    function openRoomReview() {
+      if (state.room.reviewRequest?.status === 'ready') openReviewRecord(state.room.reviewRequest.recordId, true);
+    }
+
+    function openReviewHistory() {
+      const list = document.getElementById('review-history-list');
+      list.innerHTML = state.room.reviewRecords.map((record, index) => {
+        const requester = record.requester === 'A' ? '민준' : '서연';
+        return `<div class="card"><div class="card-title">문철 ${state.room.reviewRecords.length - index}</div><div class="card-sub">${requester} 신청 · ${record.createdAt} · 읽기 전용</div><button class="btn btn-sm btn-outline" style="margin-top: 10px;" onclick="openReviewRecord('${record.id}', false)">이 문철 보기</button></div>`;
+      }).join('');
+      openSheet('SHEET_MUNCHEOL_HISTORY');
+    }
+
+    function openReviewRecord(recordId, isCurrent) {
+      const record = state.room.reviewRecords.find(item => item.id === recordId);
+      if (!record) return;
+      closeSheet('SHEET_MUNCHEOL_HISTORY');
+      const order = state.room.reviewRecords.findIndex(item => item.id === recordId);
+      document.getElementById('review-result-context').innerText = isCurrent
+        ? `현재 문철 · ${record.createdAt} · 현재 문철 아래에서 새 신청을 시작할 수 있어요.`
+        : `문철 기록 ${state.room.reviewRecords.length - order} · ${record.createdAt} · 읽기 전용`;
+      openSheet('SHEET_MUNCHEOL');
+    }
+
+    function showToast(message) {
+      document.getElementById('mockup-toast')?.remove();
+      const toast = document.createElement('div');
+      toast.id = 'mockup-toast';
+      toast.className = 'toast';
+      toast.setAttribute('role', 'status');
+      toast.innerText = message;
+      document.body.append(toast);
+      window.setTimeout(() => toast.remove(), 3600);
     }
 
     // Draw Negotiation Flow
@@ -1001,7 +1135,9 @@
             { sender: 'A', text: '나도 갑자기 일이 생겨서 어쩔 수 없었어.', isRec: false }
           ],
           hasDrawProposal: false,
-          drawProposal: null
+          drawProposal: null,
+          reviewRequest: null,
+          reviewRecords: []
         },
         missions: [
           {
