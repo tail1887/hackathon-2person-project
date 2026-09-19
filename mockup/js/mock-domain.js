@@ -30,8 +30,8 @@ const MockDomain = {
       id: `M-${Date.now()}`,
       title: condition.text,
       type: condition.resp === '함께' ? 'joint' : 'personal',
-      performer: condition.resp === '상대' ? proposer : accepter,
-      confirmer: condition.resp === '상대' ? accepter : proposer,
+      performer: condition.resp === '나' ? proposer : accepter,
+      confirmer: condition.resp === '나' ? accepter : proposer,
       status: 'in_progress',
       revision: 1
     };
