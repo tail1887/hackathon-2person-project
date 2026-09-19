@@ -97,6 +97,12 @@
     .msg-sender { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 3px; font-weight: 600; }
     .msg-recommended { border: 1.5px dashed #818cf8; }
     .msg-badge { font-size: 0.65rem; background: rgba(255,255,255,0.25); color: white; padding: 2px 5px; border-radius: 4px; margin-left: 4px; }
+    .msg-detail-trigger { cursor: pointer; }
+    .msg-detail-trigger:focus { outline: 2px solid #c7d2fe; outline-offset: 2px; }
+    .msg-detail-hint { display: block; margin-top: 5px; font-size: 0.7rem; opacity: 0.78; }
+    .msg-private-detail { margin-top: 9px; padding: 9px; border-radius: 8px; background: rgba(255,255,255,0.94); color: #1f2937; font-size: 0.78rem; }
+    .msg-private-detail-item + .msg-private-detail-item { margin-top: 7px; }
+    .msg-private-detail-label { display: block; margin-bottom: 2px; color: #6366f1; font-weight: 700; }
 
     /* Bottom Action Area in Chat */
     .chat-bottom { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
@@ -574,6 +580,7 @@
           { sender: 'B', text: '아까 약속 시간에 늦은 거 너무 서운했어.', isRec: false },
           { sender: 'A', text: '나도 갑자기 일이 생겨서 어쩔 수 없었어.', isRec: false }
         ],
+        expandedMessageId: null,
         hasDrawProposal: false,
         drawProposal: null, // proposal object
         negotiationHistory: [],
@@ -791,13 +798,25 @@
 
       // Messages
       const container = document.getElementById('chat-messages');
-      container.innerHTML = state.room.messages.map(m => {
+      container.innerHTML = state.room.messages.map((m, index) => {
         const isMe = m.sender === state.currentUser;
         const senderName = m.sender === 'A' ? '민준' : '서연';
+        const messageId = m.id || `initial-${index}`;
+        const canOpenPrivateDetail = isMe && m.aiMediation;
+        const isExpanded = state.room.expandedMessageId === messageId;
+        const privateDetail = isExpanded ? `
+          <div class="msg-private-detail">
+            <div class="msg-private-detail-item"><span class="msg-private-detail-label">내 원문</span>${escapeHtml(m.originalBody)}</div>
+            <div class="msg-private-detail-item"><span class="msg-private-detail-label">AI 추천문</span>${m.recommendationBodies.map((body, recommendationIndex) => `${recommendationIndex + 1}. ${escapeHtml(body)}`).join('<br>')}</div>
+            <div class="msg-private-detail-item"><span class="msg-private-detail-label">실제 전송</span>${m.sendChoice === 'recommendation' ? `AI 추천문 ${m.recommendationIndex + 1}` : '원문'}</div>
+          </div>
+        ` : '';
         return `
-          <div class="msg-bubble ${isMe ? 'msg-right' : 'msg-left'} ${m.isRec ? 'msg-recommended' : ''}">
+          <div class="msg-bubble ${isMe ? 'msg-right' : 'msg-left'} ${m.isRec ? 'msg-recommended' : ''} ${canOpenPrivateDetail ? 'msg-detail-trigger' : ''}" ${canOpenPrivateDetail ? `role="button" tabindex="0" onclick="toggleMessageDetail('${messageId}')" onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleMessageDetail('${messageId}'); }"` : ''}>
             <div class="msg-sender">${senderName} ${m.isRec ? '<span class="msg-badge">AI 추천</span>' : ''}</div>
-            ${m.text}
+            ${escapeHtml(m.text)}
+            ${canOpenPrivateDetail ? `<span class="msg-detail-hint">${isExpanded ? '클릭해 상세 접기' : '클릭해 내 원문과 AI 추천문 보기'}</span>` : ''}
+            ${privateDetail}
           </div>
         `;
       }).join('');
@@ -822,20 +841,41 @@
       document.getElementById('ai-sheet-restricted').style.display = (mode === 'restricted') ? 'block' : 'none';
     }
 
+    const aiRecommendations = [
+      '아까 그 말 때문에 내 마음이 조금 서운했어. 너와 솔직하게 이야기하고 싶어.',
+      '우리가 서로 오해한 부분이 있는 것 같아. 천천히 정리해 볼까?'
+    ];
+
+    function createAIMediatedMessage(originalBody, sendChoice, recommendationIndex = null) {
+      return {
+        id: `MSG-${Date.now()}-${state.room.messages.length}`,
+        sender: state.currentUser,
+        text: sendChoice === 'recommendation' ? aiRecommendations[recommendationIndex] : originalBody,
+        isRec: sendChoice === 'recommendation',
+        aiMediation: true,
+        originalBody,
+        recommendationBodies: [...aiRecommendations],
+        sendChoice,
+        recommendationIndex
+      };
+    }
+
+    function toggleMessageDetail(messageId) {
+      state.room.expandedMessageId = state.room.expandedMessageId === messageId ? null : messageId;
+      renderRoom();
+    }
+
     function sendOriginalMsg() {
       const val = document.getElementById('chat-draft-input').value.trim();
-      state.room.messages.push({ sender: state.currentUser, text: val, isRec: false });
+      state.room.messages.push(createAIMediatedMessage(val, 'original'));
       document.getElementById('chat-draft-input').value = '';
       closeSheet('SHEET_AI_JUDGE');
       renderRoom();
     }
 
     function sendRecommendedMsg(index) {
-      const recs = [
-        "아까 그 말 때문에 내 마음이 조금 서운했어. 너와 솔직하게 이야기하고 싶어.",
-        "우리가 서로 오해한 부분이 있는 것 같아. 천천히 정리해 볼까?"
-      ];
-      state.room.messages.push({ sender: state.currentUser, text: recs[index], isRec: true });
+      const val = document.getElementById('chat-draft-input').value.trim();
+      state.room.messages.push(createAIMediatedMessage(val, 'recommendation', index));
       document.getElementById('chat-draft-input').value = '';
       closeSheet('SHEET_AI_JUDGE');
       renderRoom();
@@ -1349,6 +1389,7 @@
             { sender: 'B', text: '아까 약속 시간에 늦은 거 너무 서운했어.', isRec: false },
             { sender: 'A', text: '나도 갑자기 일이 생겨서 어쩔 수 없었어.', isRec: false }
           ],
+          expandedMessageId: null,
           hasDrawProposal: false,
           drawProposal: null,
           negotiationHistory: [],
