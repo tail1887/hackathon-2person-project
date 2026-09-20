@@ -10,6 +10,10 @@ type Member = { room_id: string; role: "creator" | "invitee"; public_member_key:
 type Message = { id: string; room_id: string; sender_member_key: string; body: string; sequence: number; sent_at: string };
 type ConnectionState = "loading" | "connected" | "recovering" | "failed";
 type JudgeResult = { result_type: "normal" | "restricted"; risk: string; inference: string; recommendations: { text: string }[] };
+type PositionResult = { current_position: string; issues: string[]; next_move: string };
+type ReviewResult = { summary: string; different_points: string[]; wishes_and_worries: string[]; next_move: string };
+type ReviewRequest = { id: string; status: "pending" | "processing" | "ready" | "failed"; is_requester: boolean; is_responder: boolean };
+type RoomReview = { id: string; result: ReviewResult; status: "ready" };
 
 export function RoomScreen({ roomId }: { roomId: string }) {
   const supabase = getBrowserSupabase();
@@ -21,21 +25,31 @@ export function RoomScreen({ roomId }: { roomId: string }) {
   const [judge, setJudge] = useState<{ id: string; result: JudgeResult }>();
   const [judgeError, setJudgeError] = useState<string>();
   const [isJudging, setIsJudging] = useState(false);
+  const [position, setPosition] = useState<PositionResult>();
+  const [reviewRequest, setReviewRequest] = useState<ReviewRequest>();
+  const [roomReview, setRoomReview] = useState<RoomReview>();
+  const [isRoomReviewOpen, setIsRoomReviewOpen] = useState(false);
+  const [toolError, setToolError] = useState<string>();
+  const [isToolWorking, setIsToolWorking] = useState(false);
   const latestRevision = useRef(0);
   const recovering = useRef(false);
 
   const loadSnapshot = useCallback(async () => {
     if (!supabase) return false;
-    const [roomResult, membersResult, messagesResult] = await Promise.all([
+    const [roomResult, membersResult, messagesResult, reviewRequestResult, roomReviewResult] = await Promise.all([
       supabase.from("room_public").select("id,status,room_revision").eq("id", roomId).maybeSingle(),
       supabase.from("room_member_public").select("room_id,role,public_member_key,room_display_name").eq("room_id", roomId),
       supabase.from("room_message_public").select("id,room_id,sender_member_key,body,sequence,sent_at").eq("room_id", roomId).order("sequence"),
+      supabase.from("room_review_request_public").select("id,status,is_requester,is_responder").eq("room_id", roomId).order("requested_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("room_review_public").select("id,result,status").eq("room_id", roomId).eq("status", "ready").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
     if (roomResult.error || !roomResult.data || membersResult.error || messagesResult.error) return false;
     const nextRoom = roomResult.data as Room;
     if (nextRoom.room_revision < latestRevision.current) return true;
     latestRevision.current = nextRoom.room_revision;
     setRoom(nextRoom); setMembers((membersResult.data ?? []) as Member[]); setMessages((messagesResult.data ?? []) as Message[]);
+    setReviewRequest((reviewRequestResult.data ?? undefined) as ReviewRequest | undefined);
+    setRoomReview((roomReviewResult.data ?? undefined) as RoomReview | undefined);
     return true;
   }, [roomId, supabase]);
 
@@ -69,6 +83,33 @@ export function RoomScreen({ roomId }: { roomId: string }) {
     setDraft(""); setJudge(undefined); await loadSnapshot();
   }
 
+  async function requestPosition() {
+    if (!supabase) return;
+    setIsToolWorking(true); setToolError(undefined); setPosition(undefined);
+    const { data, error } = await supabase.functions.invoke("private-position", { body: { roomId } });
+    setIsToolWorking(false);
+    if (error || !data?.ok) { setToolError(error ? await getFunctionErrorMessage(error, "형세 파악을 준비하지 못했어요.") : data?.error?.message ?? "형세 파악을 준비하지 못했어요."); return; }
+    setPosition(data.data.result as PositionResult);
+  }
+
+  async function requestRoomReview() {
+    if (!supabase) return;
+    setIsToolWorking(true); setToolError(undefined);
+    const { data, error } = await supabase.functions.invoke("room-review-request", { body: { roomId } });
+    setIsToolWorking(false);
+    if (error || !data?.ok) { setToolError(error ? await getFunctionErrorMessage(error, "AI 문철을 신청하지 못했어요.") : data?.error?.message ?? "AI 문철을 신청하지 못했어요."); return; }
+    await loadSnapshot();
+  }
+
+  async function acceptRoomReview() {
+    if (!supabase || !reviewRequest) return;
+    setIsToolWorking(true); setToolError(undefined);
+    const { data, error } = await supabase.functions.invoke("room-review-accept", { body: { requestId: reviewRequest.id } });
+    setIsToolWorking(false);
+    if (error || !data?.ok) { setToolError(error ? await getFunctionErrorMessage(error, "AI 문철을 수락하지 못했어요.") : data?.error?.message ?? "AI 문철을 수락하지 못했어요."); return; }
+    await loadSnapshot();
+  }
+
   useEffect(() => {
     if (!supabase) return;
     let disposed = false;
@@ -79,6 +120,7 @@ export function RoomScreen({ roomId }: { roomId: string }) {
     const channel = supabase.channel(`room:${roomId}`, { config: { private: true } })
       .on("broadcast", { event: "room.member_joined" }, () => void loadSnapshot())
       .on("broadcast", { event: "message.sent" }, () => void loadSnapshot())
+      .on("broadcast", { event: "room.review_changed" }, () => void loadSnapshot())
       .subscribe((status) => {
         if (disposed) return;
         if (status === "SUBSCRIBED") { void loadSnapshot().then((loaded) => loaded ? setConnection("connected") : recover()); }
@@ -108,15 +150,21 @@ export function RoomScreen({ roomId }: { roomId: string }) {
       </section>
       <section className="chat-bottom" aria-label="대국 도구와 메시지 초안">
         <div className="chat-tools">
-          <button className="tool-button" disabled type="button">📊 형세 파악</button>
-          <button className="tool-button" disabled type="button">⚖️ AI 문철</button>
+          <button className="tool-button" disabled={isToolWorking || room.status !== "active"} onClick={requestPosition} type="button">📊 형세 파악</button>
+          <button className="tool-button" disabled={isToolWorking || room.status !== "active" || members.length < 2 || Boolean(reviewRequest && reviewRequest.status !== "ready")} onClick={requestRoomReview} type="button">⚖️ AI 문철</button>
           <button className="tool-button tool-button-outline" disabled type="button">🤝 무승부 제안</button>
         </div>
         <div className="chat-input-row"><textarea aria-label="메시지 초안" onChange={(event) => { setDraft(event.target.value); setJudge(undefined); }} placeholder="초안 메시지를 입력하세요..." rows={2} value={draft} /><button className="primary-button" disabled={isJudging || !draft.trim() || room.status !== "active"} onClick={requestJudge} type="button">{isJudging ? "확인 중…" : "확인"}</button></div>
         <p className="chat-boundary-note">초안 작성 뒤 AI 심판을 거친 메시지만 전송됩니다.</p>
         {judgeError && <p className="notice">{judgeError}</p>}
+        {toolError && <p className="notice">{toolError}</p>}
+        {reviewRequest?.status === "pending" && <section className="tool-sheet"><strong>AI 문철 신청이 도착했어요</strong><p>{reviewRequest.is_responder ? "두 사람이 함께 확인할 공용 문철을 만들까요? 수락 뒤에만 AI가 대화를 정리해요." : "상대의 수락을 기다리고 있어요. 수락 전에는 AI 분석을 만들지 않아요."}</p>{reviewRequest.is_responder && <button className="primary-button" disabled={isToolWorking} onClick={acceptRoomReview} type="button">문철 수락</button>}</section>}
+        {reviewRequest && ["processing"].includes(reviewRequest.status) && <section className="tool-sheet"><strong>AI 문철을 정리하고 있어요</strong><p>두 사람에게 같은 결과가 준비되면 아래 버튼으로 확인할 수 있어요.</p></section>}
+        {roomReview && <button className="review-open-button" onClick={() => setIsRoomReviewOpen(true)} type="button">AI 문철 확인하기</button>}
         {judge && <section className="judge-sheet" aria-label="AI 심판 결과"><strong>⚖️ AI 심판 결과</strong><p>{judge.result.risk}</p><p>{judge.result.inference}</p>{judge.result.result_type === "restricted" ? <button className="secondary-button" onClick={() => setJudge(undefined)} type="button">초안 수정</button> : <><p className="hint">추천: {judge.result.recommendations[0]?.text}</p><div className="button-row"><button className="secondary-button" disabled={isJudging} onClick={() => void sendChoice("original")} type="button">원문 전송</button><button className="primary-button" disabled={isJudging || !judge.result.recommendations[0]} onClick={() => void sendChoice("recommendation")} type="button">추천 전송</button></div></>}</section>}
       </section>
+      {position && <section className="analysis-dialog" role="dialog" aria-modal="true" aria-label="개인 형세 파악"><div className="analysis-card"><button className="dialog-close" onClick={() => setPosition(undefined)} type="button" aria-label="닫기">×</button><p className="eyebrow">나만 보는 형세 파악</p><h2>현재 대화의 흐름</h2><p>{position.current_position}</p><h3>쟁점</h3><ul>{position.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul><h3>다음 판단</h3><p>{position.next_move}</p></div></section>}
+      {isRoomReviewOpen && roomReview?.result && <section className="analysis-dialog" role="dialog" aria-modal="true" aria-label="AI 문철"><div className="analysis-card"><button className="dialog-close" onClick={() => setIsRoomReviewOpen(false)} type="button" aria-label="닫기">×</button><p className="eyebrow">두 사람의 AI 문철</p><h2>대화 요약</h2><p>{roomReview.result.summary}</p><h3>서로 다른 지점</h3><ul>{roomReview.result.different_points.map((point) => <li key={point}>{point}</li>)}</ul><h3>바람과 걱정</h3><ul>{roomReview.result.wishes_and_worries.map((item) => <li key={item}>{item}</li>)}</ul><h3>다음 수</h3><p>{roomReview.result.next_move}</p></div></section>}
     </div>
   </section></main>;
 }
