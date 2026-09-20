@@ -31,13 +31,17 @@ Deno.serve(async (request) => {
   } };
   try {
     const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.6", input: [{ role: "system", content: "You are a neutral Korean relationship conversation mediator. Analyze only the supplied chat. Do not declare winners, blame either participant, diagnose their relationship, or state certainty about inner feelings. Wishes, worries, and next move must begin with AI의 추정:." }, { role: "user", content: contextText || "아직 확정된 대화가 없습니다." }], text: { format: { type: "json_schema", name: "room_review", strict: true, schema } } }) });
-    const payload = await response.json(); const result = JSON.parse(payload.output_text ?? "{}");
-    if (!response.ok || !result.summary) throw new Error("invalid_ai_response");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(`openai_http_${response.status}`);
+    const result = JSON.parse(payload.output_text ?? "{}");
+    if (!result.summary) throw new Error("invalid_ai_response");
     await admin.from("ai_analyses").update({ status: "ready", result_type: "normal", result, updated_at: new Date().toISOString() }).eq("id", analysis.id);
     await admin.from("room_review_requests").update({ status: "ready" }).eq("id", requestId);
     return json({ ok: true, data: { analysisId: analysis.id } });
-  } catch {
-    await admin.from("ai_analyses").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", analysis.id);
+  } catch (error) {
+    const failureCode = error instanceof Error && /^[a-z0-9_]+$/.test(error.message) ? error.message : "ai_request_failed";
+    console.error("room_review_failed", failureCode);
+    await admin.from("ai_analyses").update({ status: "failed", result: { failure_code: failureCode }, updated_at: new Date().toISOString() }).eq("id", analysis.id);
     await admin.from("room_review_requests").update({ status: "failed" }).eq("id", requestId);
     return json({ ok: false, error: { message: "AI 문철을 준비하지 못했어요. 잠시 후 다시 시도해 주세요." } }, 502);
   }

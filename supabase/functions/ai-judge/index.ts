@@ -32,13 +32,17 @@ Deno.serve(async (request) => {
   const schema = { oneOf: [{ type: "object", additionalProperties: false, required: ["result_type", "risk", "inference", "recommendations"], properties: { result_type: { const: "normal" }, risk: { type: "string" }, inference: { type: "string", pattern: "^AI의 추정:" }, recommendations: { type: "array", minItems: 2, maxItems: 3, items: recommendation } } }, { type: "object", additionalProperties: false, required: ["result_type", "risk", "inference", "recommendations"], properties: { result_type: { const: "restricted" }, risk: { type: "string" }, inference: { type: "string", pattern: "^AI의 추정:" }, recommendations: { type: "array", maxItems: 0, items: recommendation } } }] };
   try {
     const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.6", input: [{ role: "system", content: "You are a neutral Korean relationship conversation referee. Never judge who is right. Return restricted for violence, threats, coercive control, or self-harm risk. For normal results, inference must start with 'AI의 추정:'." }, { role: "user", content: draft }], text: { format: { type: "json_schema", name: "message_mediation", strict: true, schema } } }) });
-    const payload = await response.json(); const result = JSON.parse(payload.output_text ?? "{}");
-    if (!response.ok || !["normal", "restricted"].includes(result.result_type)) throw new Error("invalid_ai_response");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(`openai_http_${response.status}`);
+    const result = JSON.parse(payload.output_text ?? "{}");
+    if (!["normal", "restricted"].includes(result.result_type)) throw new Error("invalid_ai_response");
     await admin.from("ai_analyses").update({ status: "ready", result_type: result.result_type, result, updated_at: new Date().toISOString() }).eq("id", analysis.id);
     await admin.rpc("record_private_change", { p_user_id: user.id, p_room_id: roomId, p_event_type: "analysis.ready", p_resource_type: "ai_analysis", p_resource_id: analysis.id });
     return json({ ok: true, data: { analysisId: analysis.id, result } });
-  } catch {
-    await admin.from("ai_analyses").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", analysis.id);
+  } catch (error) {
+    const failureCode = error instanceof Error && /^[a-z0-9_]+$/.test(error.message) ? error.message : "ai_request_failed";
+    console.error("ai_judge_failed", failureCode);
+    await admin.from("ai_analyses").update({ status: "failed", result: { failure_code: failureCode }, updated_at: new Date().toISOString() }).eq("id", analysis.id);
     await admin.rpc("record_private_change", { p_user_id: user.id, p_room_id: roomId, p_event_type: "analysis.failed", p_resource_type: "ai_analysis", p_resource_id: analysis.id });
     return json({ ok: false, error: { message: "AI 심판을 준비하지 못했어요. 잠시 후 다시 확인해 주세요." } }, 502);
   }

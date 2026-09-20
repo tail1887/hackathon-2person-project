@@ -33,13 +33,17 @@ Deno.serve(async (request) => {
   } };
   try {
     const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.6", input: [{ role: "system", content: "You are a neutral Korean relationship conversation guide. Analyze only the supplied chat. Never decide who is right, diagnose a relationship, or claim certainty. Every field must begin with AI의 추정:." }, { role: "user", content: contextText || "아직 확정된 대화가 없습니다." }], text: { format: { type: "json_schema", name: "private_position", strict: true, schema } } }) });
-    const payload = await response.json(); const result = JSON.parse(payload.output_text ?? "{}");
-    if (!response.ok || !result.current_position) throw new Error("invalid_ai_response");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(`openai_http_${response.status}`);
+    const result = JSON.parse(payload.output_text ?? "{}");
+    if (!result.current_position) throw new Error("invalid_ai_response");
     await admin.from("ai_analyses").update({ status: "ready", result_type: "normal", result, updated_at: new Date().toISOString() }).eq("id", analysis.id);
     await admin.rpc("record_private_change", { p_user_id: user.id, p_room_id: roomId, p_event_type: "analysis.ready", p_resource_type: "ai_analysis", p_resource_id: analysis.id });
     return json({ ok: true, data: { analysisId: analysis.id, result } });
-  } catch {
-    await admin.from("ai_analyses").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", analysis.id);
+  } catch (error) {
+    const failureCode = error instanceof Error && /^[a-z0-9_]+$/.test(error.message) ? error.message : "ai_request_failed";
+    console.error("private_position_failed", failureCode);
+    await admin.from("ai_analyses").update({ status: "failed", result: { failure_code: failureCode }, updated_at: new Date().toISOString() }).eq("id", analysis.id);
     await admin.rpc("record_private_change", { p_user_id: user.id, p_room_id: roomId, p_event_type: "analysis.failed", p_resource_type: "ai_analysis", p_resource_id: analysis.id });
     return json({ ok: false, error: { message: "형세 파악을 준비하지 못했어요. 잠시 후 다시 시도해 주세요." } }, 502);
   }
