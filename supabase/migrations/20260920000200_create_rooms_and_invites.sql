@@ -50,12 +50,55 @@ alter table public.room_members enable row level security;
 alter table public.invites enable row level security;
 alter table public.messages enable row level security;
 
-create policy "rooms_select_member" on public.rooms for select to authenticated
-  using (exists (select 1 from public.room_members m where m.room_id = rooms.id and m.user_id = (select auth.uid())));
-create policy "room_members_select_member" on public.room_members for select to authenticated
-  using (exists (select 1 from public.room_members mine where mine.room_id = room_members.room_id and mine.user_id = (select auth.uid())));
-create policy "messages_select_member" on public.messages for select to authenticated
-  using (exists (select 1 from public.room_members m where m.room_id = messages.room_id and m.user_id = (select auth.uid())));
+-- This helper runs without the caller's row policy to avoid the recursive
+-- room_members policy that a membership subquery would otherwise create.
+create or replace function public.is_room_member(p_room_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.room_members
+    where room_id = p_room_id
+      and user_id = (select auth.uid())
+  );
+$$;
+
+revoke all on function public.is_room_member(uuid) from public;
+grant execute on function public.is_room_member(uuid) to authenticated;
+
+-- Base tables retain internal user IDs for server commands only. A user can
+-- directly read at most their own base rows; shared data is exposed through
+-- the public projections below, which omit those IDs.
+create policy "rooms_select_creator_only" on public.rooms for select to authenticated
+  using (creator_user_id = (select auth.uid()));
+create policy "room_members_select_own" on public.room_members for select to authenticated
+  using (user_id = (select auth.uid()));
+create policy "messages_select_sender_only" on public.messages for select to authenticated
+  using (sender_user_id = (select auth.uid()));
+
+revoke select on public.rooms, public.room_members, public.messages from anon, authenticated;
+
+create view public.room_public as
+  select r.id, r.status, r.room_revision, r.created_at, r.activated_at, r.closed_at
+  from public.rooms r
+  where public.is_room_member(r.id);
+
+create view public.room_member_public as
+  select m.room_id, m.role, m.public_member_key, m.room_display_name, m.joined_at, m.last_seen_at
+  from public.room_members m
+  where public.is_room_member(m.room_id);
+
+create view public.room_message_public as
+  select msg.id, msg.room_id, sender.public_member_key as sender_member_key, msg.body, msg.sequence, msg.sent_at
+  from public.messages msg
+  join public.room_members sender on sender.room_id = msg.room_id and sender.user_id = msg.sender_user_id
+  where public.is_room_member(msg.room_id);
+
+grant select on public.room_public, public.room_member_public, public.room_message_public to authenticated;
 
 create or replace function public.create_room_with_invite(p_code char(6), p_token_digest text)
 returns table(room_id uuid, error_code text)
