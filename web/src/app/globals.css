@@ -1056,6 +1056,22 @@ input:focus {
 .mission-list:has(.mission-list-item:only-child) {
   display: none;
 }
+.mission-detail-heading h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.mission-meta {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.mission-detail .mission-text {
+  margin: 14px 0 6px;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
 .negotiation-card > p,
 .negotiation-title p {
   margin: 0;

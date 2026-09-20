@@ -77,7 +77,6 @@ type Props = {
   onCreateChange: (
     missionId: string,
     text: string,
-    dueDate: string | null,
     kind: "individual" | "joint",
     ownerMemberKey: string | null,
   ) => void;
@@ -94,12 +93,6 @@ const statusLabel: Record<Mission["status"], string> = {
   completed: "완료",
   abandoned: "포기됨",
 };
-const missionDateStart = new Date();
-const missionDateMin = missionDateStart.toISOString().slice(0, 10);
-const missionDateMax = new Date(missionDateStart.getTime() + 86400000)
-  .toISOString()
-  .slice(0, 10);
-
 function memberName(key: string | null, members: MemberOption[]) {
   return (
     members.find((member) => member.public_member_key === key)
@@ -137,13 +130,11 @@ export function MissionBoard({
     "individual",
   );
   const [draftOwner, setDraftOwner] = useState<string>("");
-  const [draftDueDate, setDraftDueDate] = useState("");
 
   function beginEdit(mission: Mission) {
     setDraftText(mission.text);
     setDraftKind(mission.kind);
     setDraftOwner(mission.owner_member_key ?? myMemberKey ?? "");
-    setDraftDueDate(mission.due_date ?? "");
     setEditing(true);
   }
 
@@ -215,20 +206,21 @@ export function MissionBoard({
       <article className="card mission-detail">
         <div className="mission-detail-heading">
           <div>
-            <span className={`tag mission-status mission-${selected.status}`}>
-              {statusLabel[selected.status]}
-            </span>
             <h2>
-              {selected.kind === "joint"
-                ? "🤝 함께 하는 퀘스트"
-                : `🎯 ${memberName(selected.owner_member_key, members)}의 미션`}
+              {selected.kind === "joint" ? "🤝 공동 퀘스트" : "🎯 개인 미션"}
             </h2>
+            <p className="mission-meta">
+              {selected.kind === "joint"
+                ? "참여자: 두 사람"
+                : `수행자: ${memberName(selected.owner_member_key, members)}`}
+            </p>
           </div>
-          <span className="hint">버전 {selected.current_revision}</span>
+          <span className={`tag mission-status mission-${selected.status}`}>
+            {statusLabel[selected.status]}
+          </span>
         </div>
         <p className="mission-text">{selected.text}</p>
         <p className="hint">
-          {dateLabel(selected.due_date)} ·{" "}
           {selected.kind === "joint"
             ? "두 사람이 모두 체크하면 완료됩니다."
             : isOwner
@@ -408,16 +400,6 @@ export function MissionBoard({
                 </select>
               </label>
             )}
-            <label>
-              기한
-              <input
-                max={missionDateMax}
-                min={missionDateMin}
-                onChange={(event) => setDraftDueDate(event.target.value)}
-                type="date"
-                value={draftDueDate}
-              />
-            </label>
             <div className="mission-actions">
               <button
                 className="btn btn-primary"
@@ -430,7 +412,6 @@ export function MissionBoard({
                   onCreateChange(
                     selected.id,
                     draftText,
-                    draftDueDate || null,
                     draftKind,
                     draftKind === "individual" ? draftOwner : null,
                   );

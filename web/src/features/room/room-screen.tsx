@@ -547,7 +547,6 @@ export function RoomScreen({
   async function createMissionChange(
     missionId: string,
     text: string,
-    dueDate: string | null,
     kind: "individual" | "joint",
     ownerMemberKey: string | null,
   ) {
@@ -557,7 +556,7 @@ export function RoomScreen({
     const { data, error } = await supabase.rpc("create_mission_change_offer", {
       p_mission_id: missionId,
       p_text: text,
-      p_due_date: dueDate,
+      p_due_date: null,
       p_kind: kind,
       p_owner_member_key: ownerMemberKey,
     });
@@ -717,8 +716,8 @@ export function RoomScreen({
       onAction={(missionId, action) =>
         void recordMissionAction(missionId, action)
       }
-      onCreateChange={(missionId, text, dueDate, kind, ownerMemberKey) =>
-        void createMissionChange(missionId, text, dueDate, kind, ownerMemberKey)
+      onCreateChange={(missionId, text, kind, ownerMemberKey) =>
+        void createMissionChange(missionId, text, kind, ownerMemberKey)
       }
       onResolveChange={(changeOfferId, resolution) =>
         void resolveMissionChange(changeOfferId, resolution)
