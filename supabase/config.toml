@@ -384,6 +384,14 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Browser calls need unauthenticated CORS preflight requests. Each function
+# validates the supplied access token with Auth before executing its RPC.
+[functions.room-create]
+verify_jwt = false
+
+[functions.invite-accept]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

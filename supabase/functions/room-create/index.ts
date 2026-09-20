@@ -4,6 +4,7 @@ const headers = {
   "Content-Type": "application/json",
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const randomToken = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -14,7 +15,13 @@ Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ ok: false, error: { code: "method_not_allowed", message: "허용하지 않는 요청이에요." } }, 405);
   const authorization = request.headers.get("Authorization");
   if (!authorization) return json({ ok: false, error: { code: "unauthenticated", message: "로그인이 필요해요." } }, 401);
-  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authorization } } });
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const accessToken = authorization.replace(/^Bearer\s+/i, "");
+  const auth = createClient(supabaseUrl, supabaseAnonKey);
+  const { data: { user }, error: authError } = await auth.auth.getUser(accessToken);
+  if (authError || !user) return json({ ok: false, error: { code: "unauthenticated", message: "로그인이 필요해요." } }, 401);
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authorization } } });
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const token = randomToken(); const code = String(Math.floor(100000 + Math.random() * 900000));
     const { data, error } = await supabase.rpc("create_room_with_invite", { p_code: code, p_token_digest: await digest(token) });
