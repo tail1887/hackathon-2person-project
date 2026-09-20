@@ -28,11 +28,11 @@ Deno.serve(async (request) => {
   const inputHash = await hash(draft);
   const { data: analysis, error: analysisError } = await admin.from("ai_analyses").insert({ room_id: roomId, requester_user_id: user.id, draft_id: saved.data.id, draft_revision: revision, type: "message_mediation", visibility: "private", input_hash: inputHash }).select("id").single();
   if (analysisError || !analysis) return json({ ok: false, error: { message: "AI 심판을 준비하지 못했어요." } }, 500);
-  const recommendation = { type: "object", additionalProperties: false, required: ["text"], properties: { text: { type: "string" } } };
+  const recommendation = { type: "object", additionalProperties: false, required: ["text"], properties: { text: { type: "string", description: "The exact first-person Korean reply the user can send to their counterpart now. It is not advice, analysis, or an instruction to the user." } } };
   // Structured Outputs는 최상위 스키마를 객체로 요구한다. normal/restricted 분기는 반환값 검증에서 강제한다.
   const schema = { type: "object", additionalProperties: false, required: ["result_type", "risk", "inference", "recommendations"], properties: { result_type: { type: "string", enum: ["normal", "restricted"] }, risk: { type: "string" }, inference: { type: "string", pattern: "^AI의 추정:" }, recommendations: { type: "array", maxItems: 3, items: recommendation } } };
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.6", input: [{ role: "system", content: "You are a neutral Korean relationship conversation referee. Never judge who is right. Return restricted for violence, threats, coercive control, or self-harm risk. For normal results, inference must start with 'AI의 추정:'." }, { role: "user", content: draft }], text: { format: { type: "json_schema", name: "message_mediation", strict: true, schema } } }) });
+    const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.6", input: [{ role: "system", content: "You are a neutral Korean relationship conversation referee. Never judge who is right. Return restricted for violence, threats, coercive control, or self-harm risk. For normal results, inference must start with 'AI의 추정:'. Each recommendation must be a ready-to-send, first-person Korean reply addressed directly to the other person. Write only the message the user could send, in one or two natural sentences. Do not give advice, explain how to communicate, or use instructional wording such as '~해보세요', '~하세요', '~하는 게 좋아요', or '~바랍니다'." }, { role: "user", content: draft }], text: { format: { type: "json_schema", name: "message_mediation", strict: true, schema } } }) });
     const payload = await response.json();
     if (!response.ok) throw new Error(`openai_http_${response.status}`);
     const outputText = typeof payload.output_text === "string" ? payload.output_text : payload.output?.flatMap((item: { content?: { type?: string; text?: string }[] }) => item.content ?? []).find((item: { type?: string; text?: string }) => item.type === "output_text" && typeof item.text === "string")?.text;
@@ -42,6 +42,7 @@ Deno.serve(async (request) => {
     // MVP 전송에는 하나의 추천문이면 충분하다. restricted 결과에는 추천문을 제공하지 않는다.
     if (result.result_type === "normal" && recommendationCount < 1) throw new Error("missing_recommendation");
     if (result.result_type === "restricted" && recommendationCount !== 0) throw new Error("restricted_with_recommendation");
+    if (result.result_type === "normal" && result.recommendations.some((recommendation: { text?: unknown }) => typeof recommendation.text !== "string" || /(해보세요|확인해 보세요|진정한 뒤|말해보세요|하는 게 좋아요|바랍니다)/.test(recommendation.text))) throw new Error("instructional_recommendation");
     await admin.from("ai_analyses").update({ status: "ready", result_type: result.result_type, result, updated_at: new Date().toISOString() }).eq("id", analysis.id);
     await admin.rpc("record_private_change", { p_user_id: user.id, p_room_id: roomId, p_event_type: "analysis.ready", p_resource_type: "ai_analysis", p_resource_id: analysis.id });
     return json({ ok: true, data: { analysisId: analysis.id, result } });
