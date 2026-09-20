@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { getFunctionErrorMessage } from "@/lib/supabase/function-error";
 import { Avatar } from "@/features/profile/avatar";
 
 type Profile = { display_name: string };
@@ -42,7 +43,7 @@ export function Dashboard() {
     if (!supabase) return; setIsWorking(true); setError(undefined);
     const { data, error: invokeError } = await supabase.functions.invoke("room-create");
     setIsWorking(false);
-    if (invokeError || !data?.ok) { setError(data?.error?.message ?? "대국방을 준비하지 못했어요."); return; }
+    if (invokeError || !data?.ok) { setError(invokeError ? await getFunctionErrorMessage(invokeError, "대국방을 준비하지 못했어요.") : data?.error?.message ?? "대국방을 준비하지 못했어요."); return; }
     setCreatedInvite(data.data); setMode("waiting");
   }
   async function acceptCode() {
@@ -50,7 +51,7 @@ export function Dashboard() {
     setIsWorking(true); setError(undefined);
     const { data, error: invokeError } = await supabase.functions.invoke("invite-accept", { body: { code: inviteCode } });
     setIsWorking(false);
-    if (invokeError || !data?.ok) { setError(data?.error?.message ?? "사용할 수 없는 초대예요."); return; }
+    if (invokeError || !data?.ok) { setError(invokeError ? await getFunctionErrorMessage(invokeError, "사용할 수 없는 초대예요.") : data?.error?.message ?? "사용할 수 없는 초대예요."); return; }
     router.push(`/rooms/${data.data.roomId}`);
   }
 
