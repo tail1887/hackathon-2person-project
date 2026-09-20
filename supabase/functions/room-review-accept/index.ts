@@ -33,7 +33,8 @@ Deno.serve(async (request) => {
     const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.6", input: [{ role: "system", content: "You are a neutral Korean relationship conversation mediator. Analyze only the supplied chat. Do not declare winners, blame either participant, diagnose their relationship, or state certainty about inner feelings. Wishes, worries, and next move must begin with AI의 추정:." }, { role: "user", content: contextText || "아직 확정된 대화가 없습니다." }], text: { format: { type: "json_schema", name: "room_review", strict: true, schema } } }) });
     const payload = await response.json();
     if (!response.ok) throw new Error(`openai_http_${response.status}`);
-    const result = JSON.parse(payload.output_text ?? "{}");
+    const outputText = typeof payload.output_text === "string" ? payload.output_text : payload.output?.flatMap((item: { content?: { type?: string; text?: string }[] }) => item.content ?? []).find((item: { type?: string; text?: string }) => item.type === "output_text" && typeof item.text === "string")?.text;
+    const result = JSON.parse(outputText ?? "{}");
     if (!result.summary) throw new Error("invalid_ai_response");
     await admin.from("ai_analyses").update({ status: "ready", result_type: "normal", result, updated_at: new Date().toISOString() }).eq("id", analysis.id);
     await admin.from("room_review_requests").update({ status: "ready" }).eq("id", requestId);

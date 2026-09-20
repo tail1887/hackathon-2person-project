@@ -35,7 +35,8 @@ Deno.serve(async (request) => {
     const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.6", input: [{ role: "system", content: "You are a neutral Korean relationship conversation guide. Analyze only the supplied chat. Never decide who is right, diagnose a relationship, or claim certainty. Every field must begin with AI의 추정:." }, { role: "user", content: contextText || "아직 확정된 대화가 없습니다." }], text: { format: { type: "json_schema", name: "private_position", strict: true, schema } } }) });
     const payload = await response.json();
     if (!response.ok) throw new Error(`openai_http_${response.status}`);
-    const result = JSON.parse(payload.output_text ?? "{}");
+    const outputText = typeof payload.output_text === "string" ? payload.output_text : payload.output?.flatMap((item: { content?: { type?: string; text?: string }[] }) => item.content ?? []).find((item: { type?: string; text?: string }) => item.type === "output_text" && typeof item.text === "string")?.text;
+    const result = JSON.parse(outputText ?? "{}");
     if (!result.current_position) throw new Error("invalid_ai_response");
     await admin.from("ai_analyses").update({ status: "ready", result_type: "normal", result, updated_at: new Date().toISOString() }).eq("id", analysis.id);
     await admin.rpc("record_private_change", { p_user_id: user.id, p_room_id: roomId, p_event_type: "analysis.ready", p_resource_type: "ai_analysis", p_resource_id: analysis.id });

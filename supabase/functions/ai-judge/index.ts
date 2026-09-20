@@ -35,7 +35,8 @@ Deno.serve(async (request) => {
     const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.6", input: [{ role: "system", content: "You are a neutral Korean relationship conversation referee. Never judge who is right. Return restricted for violence, threats, coercive control, or self-harm risk. For normal results, inference must start with 'AI의 추정:'." }, { role: "user", content: draft }], text: { format: { type: "json_schema", name: "message_mediation", strict: true, schema } } }) });
     const payload = await response.json();
     if (!response.ok) throw new Error(`openai_http_${response.status}`);
-    const result = JSON.parse(payload.output_text ?? "{}");
+    const outputText = typeof payload.output_text === "string" ? payload.output_text : payload.output?.flatMap((item: { content?: { type?: string; text?: string }[] }) => item.content ?? []).find((item: { type?: string; text?: string }) => item.type === "output_text" && typeof item.text === "string")?.text;
+    const result = JSON.parse(outputText ?? "{}");
     const recommendationCount = Array.isArray(result.recommendations) ? result.recommendations.length : -1;
     if (!["normal", "restricted"].includes(result.result_type)) throw new Error("invalid_result_type");
     // MVP 전송에는 하나의 추천문이면 충분하다. restricted 결과에는 추천문을 제공하지 않는다.
