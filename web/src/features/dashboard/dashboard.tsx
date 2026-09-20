@@ -34,20 +34,25 @@ export function Dashboard() {
 
   return (
     <main className="app-shell">
-      <header className="app-header">
-        <div><p className="eyebrow">오늘의 대국</p><h1>시작 화면</h1></div>
-        <Link aria-label="내 프로필 열기" className="profile-link" href="/profile">
-          <Avatar displayName={profile?.display_name ?? "?"} />
-          <span>{profile?.display_name ?? "내 프로필"}</span>
-        </Link>
-      </header>
-      {!supabase ? <p className="notice">Supabase 공개 연결값이 아직 설정되지 않았어요.</p> : error ? <p className="notice">{error}</p> : !profile ? <p className="notice">메인을 불러오는 중…</p> : (
-        <section className="dashboard-grid">
-          <article><h2>진행 중인 미션</h2><p>진행 중인 미션이 없어요.</p></article>
-          <article><h2>진행 중인 대국</h2><p>진행 중인 대국이 없어요.</p><button className="primary-button" disabled type="button">대국 시작하기 · 페이즈 3에서 열려요</button></article>
-          <article><h2>지난 대국</h2><p>완료한 대국이 아직 없어요.</p></article>
-        </section>
-      )}
+      <section className="app-frame">
+        <header className="app-header">
+          <div className="app-title"><span className="app-title-mark">⚖</span>AI 심판</div>
+          <Link aria-label="내 프로필 열기" className="profile-link" href="/profile">
+            <Avatar displayName={profile?.display_name ?? "?"} />
+            <span className="user-badge">{profile?.display_name ?? "내 프로필"}</span>
+          </Link>
+        </header>
+        <div className="app-content">
+          <div className="page-intro"><p className="eyebrow">오늘의 대국</p><h1>시작 화면</h1><p className="muted">두 사람의 대화를 차분히 시작해 볼까요?</p></div>
+          {!supabase ? <p className="notice">Supabase 공개 연결값이 아직 설정되지 않았어요.</p> : error ? <p className="notice">{error}</p> : !profile ? <p className="notice">메인을 불러오는 중…</p> : (
+            <section className="dashboard-grid">
+              <div><h2 className="section-title">진행 중인 미션</h2><article className="card empty-card"><p>진행 중인 미션이 없습니다.</p></article></div>
+              <div><h2 className="section-title">진행 중인 대국</h2><article className="card room-card"><span className="tag tag-pending">대국 준비</span><h3>새 대국을 시작할까요?</h3><p className="card-sub">상대와 연결되면 이곳에서 대국을 이어갈 수 있어요.</p><button className="primary-button" disabled type="button">대국 시작하기 · 페이즈 3에서 열려요</button></article></div>
+              <div><h2 className="section-title">지난 대국</h2><article className="card empty-card"><p>완료한 대국이 아직 없습니다.</p></article></div>
+            </section>
+          )}
+        </div>
+      </section>
     </main>
   );
 }

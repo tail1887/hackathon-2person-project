@@ -47,18 +47,18 @@ export function ProfileScreen() {
 
   const loading = Boolean(supabase) && !savedName && !message;
   return (
-    <main className="auth-shell"><section className="auth-card" aria-labelledby="profile-title">
-      <p className="eyebrow">내 계정</p><h1 id="profile-title">내 프로필</h1>
-      {!supabase ? <p className="notice">Supabase 공개 연결값이 아직 설정되지 않았어요.</p> : loading ? <p className="notice">프로필을 불러오는 중…</p> : <>
-        <div className="avatar-preview"><Avatar displayName={displayName || savedName} size="lg" /><p>사진 업로드 없이 표시 이름으로 만든 기본 아바타예요.</p></div>
-        <form className="form-stack" onSubmit={save}>
-          <label>표시 이름<input maxLength={30} onChange={(event) => setDisplayName(event.target.value)} required value={displayName} /></label>
-          <p className="hint">변경한 이름은 이후 새로 만드는 방에만 적용돼요.</p>
-          {message && <p aria-live="polite" className="form-message">{message}</p>}
-          <div className="button-row"><button onClick={() => { setDisplayName(savedName); router.push("/"); }} type="button">취소</button><button className="primary-button" disabled={isSaving} type="submit">{isSaving ? "저장 중…" : "저장"}</button></div>
-        </form>
-        <button className="danger-button" onClick={signOut} type="button">로그아웃</button>
-      </>}
+    <main className="auth-shell profile-page"><section className="auth-card" aria-labelledby="profile-title">
+      <header className="profile-page-header"><button aria-label="메인으로 돌아가기" className="icon-button" onClick={() => router.push("/")} type="button">←</button><div><p className="eyebrow">내 계정</p><h1 id="profile-title">내 프로필</h1></div></header>
+      <div className="profile-content">{!supabase ? <p className="notice">Supabase 공개 연결값이 아직 설정되지 않았어요.</p> : loading ? <p className="notice">프로필을 불러오는 중…</p> : <>
+          <div className="avatar-preview"><Avatar displayName={displayName || savedName} size="lg" /><p>사진 업로드 없이 표시 이름으로 만든 기본 아바타예요.</p></div>
+          <form className="form-stack" onSubmit={save}>
+            <label>표시 이름<input maxLength={30} onChange={(event) => setDisplayName(event.target.value)} required value={displayName} /></label>
+            <p className="hint">변경한 이름은 이후 새로 만드는 방에만 적용돼요.</p>
+            {message && <p aria-live="polite" className="form-message">{message}</p>}
+            <div className="button-row"><button onClick={() => { setDisplayName(savedName); router.push("/"); }} type="button">취소</button><button className="primary-button" disabled={isSaving} type="submit">{isSaving ? "저장 중…" : "저장"}</button></div>
+          </form>
+          <button className="danger-button" onClick={signOut} type="button">로그아웃</button>
+        </>}</div>
     </section></main>
   );
 }
