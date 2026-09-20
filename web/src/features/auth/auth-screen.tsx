@@ -53,7 +53,7 @@ export function AuthScreen() {
     router.refresh();
   }
 
-  async function signInWith(provider: "kakao" | "google") {
+  async function signInWithGoogle() {
     const supabase = getBrowserSupabase();
     if (!supabase) {
       setMessage("Supabase 공개 연결값을 설정한 뒤 다시 시도해 주세요.");
@@ -62,7 +62,7 @@ export function AuthScreen() {
 
     setIsSubmitting(true);
     const { error } = await supabase.auth.signInWithOAuth({
-      provider,
+      provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
     });
     if (error) {
@@ -94,8 +94,7 @@ export function AuthScreen() {
 
         <div className="divider">또는</div>
         <div className="social-buttons">
-          <button disabled={isSubmitting} onClick={() => signInWith("kakao")} type="button">카카오로 계속</button>
-          <button disabled={isSubmitting} onClick={() => signInWith("google")} type="button">구글로 계속</button>
+          <button disabled={isSubmitting} onClick={signInWithGoogle} type="button">구글로 계속</button>
         </div>
         {message && <p aria-live="polite" className="form-message">{message}</p>}
         <button className="text-button" onClick={() => { setMode(mode === "signIn" ? "signUp" : "signIn"); setMessage(undefined); }} type="button">
