@@ -288,12 +288,15 @@ export function RoomScreen({ roomId }: { roomId: string }) {
     });
   }
 
-  async function sendChoice(choice: "original" | "recommendation") {
+  async function sendChoice(
+    choice: "original" | "recommendation",
+    recommendationIndex?: number,
+  ) {
     if (!supabase || !judge) return;
     setIsJudging(true);
     setJudgeError(undefined);
     const { data, error } = await supabase.functions.invoke("message-send", {
-      body: { analysisId: judge.id, choice },
+      body: { analysisId: judge.id, choice, recommendationIndex },
     });
     setIsJudging(false);
     if (error || !data?.ok) {
@@ -1018,7 +1021,7 @@ export function RoomScreen({ roomId }: { roomId: string }) {
                           <button
                             className="btn btn-sm btn-primary btn-block"
                             disabled={isJudging}
-                            onClick={() => void sendChoice("recommendation")}
+                            onClick={() => void sendChoice("recommendation", index)}
                             type="button"
                           >
                             추천 {index + 1} 전송
