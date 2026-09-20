@@ -37,7 +37,10 @@ Deno.serve(async (request) => {
     if (!response.ok) throw new Error(`openai_http_${response.status}`);
     const result = JSON.parse(payload.output_text ?? "{}");
     const recommendationCount = Array.isArray(result.recommendations) ? result.recommendations.length : -1;
-    if (!["normal", "restricted"].includes(result.result_type) || (result.result_type === "normal" && recommendationCount < 2) || (result.result_type === "restricted" && recommendationCount !== 0)) throw new Error("invalid_ai_response");
+    if (!["normal", "restricted"].includes(result.result_type)) throw new Error("invalid_result_type");
+    // MVP 전송에는 하나의 추천문이면 충분하다. restricted 결과에는 추천문을 제공하지 않는다.
+    if (result.result_type === "normal" && recommendationCount < 1) throw new Error("missing_recommendation");
+    if (result.result_type === "restricted" && recommendationCount !== 0) throw new Error("restricted_with_recommendation");
     await admin.from("ai_analyses").update({ status: "ready", result_type: result.result_type, result, updated_at: new Date().toISOString() }).eq("id", analysis.id);
     await admin.rpc("record_private_change", { p_user_id: user.id, p_room_id: roomId, p_event_type: "analysis.ready", p_resource_type: "ai_analysis", p_resource_id: analysis.id });
     return json({ ok: true, data: { analysisId: analysis.id, result } });
