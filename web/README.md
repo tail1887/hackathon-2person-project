@@ -8,13 +8,15 @@
 npm run dev
 ```
 
-브라우저에서 `http://localhost:3000`을 연다. 현재는 M1.3 프로젝트 뼈대 확인 화면만 제공하며, 로그인·대국방 기능은 M2에서 추가한다.
+브라우저에서 `http://localhost:3000`을 연다. M2 페이즈 2의 로그인·내 프로필 화면이 포함되어 있다. 대국방 생성·초대·실시간 메시지는 이후 페이즈에서 추가한다.
 
 ## 환경 변수
 
 `cp .env.example .env.local`로 공개 Supabase 연결값의 빈 파일을 만든다. `NEXT_PUBLIC_` 값만 브라우저에서 사용할 수 있다.
 
 OpenAI API 키와 Supabase service role 키는 이 폴더에 넣지 않는다. 서버 전용 값은 `supabase/.env.local` 또는 배포 플랫폼 비밀값에서 관리한다.
+
+원격 검증 전에는 프로젝트 소유자가 `supabase/migrations/20260920000100_create_profiles.sql`과 `profile-update` Edge Function을 배포하고, 로컬·Vercel에 위 공개 연결값을 설정해야 한다. 카카오·구글 Client Secret은 어떤 환경 파일에도 기록하지 않는다.
 
 ## 구조
 
