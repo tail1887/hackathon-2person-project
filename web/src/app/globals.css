@@ -21,7 +21,7 @@ h1, h2, h3, p { margin-top: 0; } h1 { margin-bottom: 8px; font-size: 1.55rem; le
 @media (max-width: 520px) { .auth-shell, .app-shell { padding: 0; } .auth-card, .app-frame { min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; } .auth-card { display: grid; align-content: center; } }
 
 /* `mockup/`의 서비스 화면 스타일을 실제 대국방에 이관한다. 테스트 도구 UI는 포함하지 않는다. */
-.mockup-app-frame { display: flex; flex-direction: column; }
+.mockup-app-frame { position: relative; display: flex; flex-direction: column; }
 .btn-icon, .btn-icon-placeholder { display: grid; width: 28px; height: 28px; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--secondary); font-size: 1.1rem; text-decoration: none; }
 .btn-icon:hover { background: #f3f4f6; }
 .btn-icon-placeholder { visibility: hidden; }
@@ -46,7 +46,7 @@ h1, h2, h3, p { margin-top: 0; } h1 { margin-bottom: 8px; font-size: 1.55rem; le
 .btn-secondary { border: 1px solid #d1d5db; background: #f3f4f6; color: #374151; }.btn-outline { border: 1px solid var(--primary); background: transparent; color: var(--primary); }
 .btn-sm { min-height: 31px; padding: 5px 8px; border-radius: 6px; font-size: .8rem; }.btn-block { width: 100%; }
 .chat-confirm-button { min-width: 60px; }
-.sheet-overlay { position: fixed; z-index: 50; inset: 0; display: none; flex-direction: column; justify-content: flex-end; background: rgba(0, 0, 0, .5); }
+.sheet-overlay { position: absolute; z-index: 50; inset: 0; display: none; flex-direction: column; justify-content: flex-end; background: rgba(0, 0, 0, .5); }
 .sheet-overlay.active { display: flex; }
 .sheet-content { max-height: 85%; overflow-y: auto; border-radius: 20px 20px 0 0; padding: 20px; background: white; box-shadow: 0 -4px 20px rgba(0,0,0,.15); }
 .sheet-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }.sheet-header h2 { margin: 0; font-size: 1.1rem; }
