@@ -861,7 +861,156 @@ input:focus {
 .sheet-actions .btn {
   flex: 1;
 }
-.position-card-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }.position-card-title span { color: var(--primary); font-size: .72rem; font-weight: 700; }.position-sheet .card { margin-bottom: 10px; }.position-sheet .card h3 { margin: 0; color: var(--text); font-size: .96rem; }.position-summary-card { border-left: 4px solid var(--primary); background: #fafafa; }.position-summary-text { margin: 8px 0 0 !important; color: var(--text) !important; font-size: .92rem !important; font-weight: 600; line-height: 1.55 !important; }.position-issues-list { display: grid; gap: 8px; margin: 10px 0 0 !important; padding: 0 !important; list-style: none; }.position-issues-list li { position: relative; padding-left: 15px; color: var(--text-muted); font-size: .83rem; line-height: 1.5; }.position-issues-list li::before { position: absolute; left: 0; color: var(--primary); content: "•"; font-weight: 800; }.position-next-card { border-color: #c7d2fe; background: #eef2ff; }.position-next-card h3 { color: var(--primary) !important; }.position-next-card p { margin: 8px 0 0 !important; color: #3730a3 !important; font-size: .86rem !important; font-weight: 600; line-height: 1.55 !important; }
+.position-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.position-card-title span {
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.position-sheet .card {
+  margin-bottom: 10px;
+}
+.position-sheet .card h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.96rem;
+}
+.position-summary-card {
+  border-left: 4px solid var(--primary);
+  background: #fafafa;
+}
+.position-summary-text {
+  margin: 8px 0 0 !important;
+  color: var(--text) !important;
+  font-size: 0.92rem !important;
+  font-weight: 600;
+  line-height: 1.55 !important;
+}
+.position-issues-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0 !important;
+  padding: 0 !important;
+  list-style: none;
+}
+.position-issues-list li {
+  position: relative;
+  padding-left: 15px;
+  color: var(--text-muted);
+  font-size: 0.83rem;
+  line-height: 1.5;
+}
+.position-issues-list li::before {
+  position: absolute;
+  left: 0;
+  color: var(--primary);
+  content: "•";
+  font-weight: 800;
+}
+.position-next-card {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+.position-next-card h3 {
+  color: var(--primary) !important;
+}
+.position-next-card p {
+  margin: 8px 0 0 !important;
+  color: #3730a3 !important;
+  font-size: 0.86rem !important;
+  font-weight: 600;
+  line-height: 1.55 !important;
+}
+.room-review-sheet .card {
+  margin-bottom: 10px;
+}
+.room-review-sheet .card h3 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+.room-review-summary-card {
+  border-left: 4px solid var(--primary);
+  background: #fafafa;
+}
+.room-review-summary-card p {
+  margin: 8px 0 0 !important;
+  color: var(--text) !important;
+  font-size: 0.9rem !important;
+  font-weight: 600;
+  line-height: 1.55 !important;
+}
+.room-review-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0 !important;
+  padding: 0 !important;
+  list-style: none;
+}
+.room-review-list li {
+  position: relative;
+  padding-left: 15px;
+  color: var(--text-muted);
+  font-size: 0.83rem;
+  line-height: 1.5;
+}
+.room-review-list li::before {
+  position: absolute;
+  left: 0;
+  color: var(--primary);
+  content: "•";
+  font-weight: 800;
+}
+.room-review-next-card {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
+.room-review-next-card h3 {
+  color: var(--primary) !important;
+}
+.room-review-next-card p {
+  margin: 8px 0 0 !important;
+  color: #3730a3 !important;
+  font-size: 0.86rem !important;
+  font-weight: 600;
+  line-height: 1.55 !important;
+}
+.room-review-secondary-action {
+  margin-top: 8px;
+}
+.room-review-history-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+.room-review-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px;
+  background: #fff;
+  color: var(--text);
+  text-align: left;
+}
+.room-review-history-item.is-selected {
+  border-color: var(--primary);
+  background: #eef2ff;
+}
+.room-review-history-item span {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+.room-review-record {
+  margin-top: 12px;
+}
 .negotiation-overlay {
   z-index: 60;
 }

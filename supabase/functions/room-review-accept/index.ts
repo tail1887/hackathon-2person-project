@@ -24,18 +24,18 @@ Deno.serve(async (request) => {
   if (analysisError || !analysis) { await admin.from("room_review_requests").update({ status: "failed" }).eq("id", requestId); return json({ ok: false, error: { message: "AI 문철을 준비하지 못했어요." } }, 500); }
   await admin.from("room_review_requests").update({ analysis_id: analysis.id }).eq("id", requestId);
   const schema = { type: "object", additionalProperties: false, required: ["summary", "different_points", "wishes_and_worries", "next_move"], properties: {
-    summary: { type: "string" },
-    different_points: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" } },
-    wishes_and_worries: { type: "array", minItems: 1, maxItems: 3, items: { type: "string", pattern: "^AI의 추정:" } },
-    next_move: { type: "string", pattern: "^AI의 추정:" },
+    summary: { type: "string", minLength: 1, maxLength: 140 },
+    different_points: { type: "array", minItems: 1, maxItems: 3, items: { type: "string", minLength: 1, maxLength: 110 } },
+    wishes_and_worries: { type: "array", minItems: 1, maxItems: 3, items: { type: "string", minLength: 1, maxLength: 110 } },
+    next_move: { type: "string", minLength: 1, maxLength: 180 },
   } };
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.6", input: [{ role: "system", content: "You are a neutral Korean relationship conversation mediator. Analyze only the supplied chat. Do not declare winners, blame either participant, diagnose their relationship, or state certainty about inner feelings. Wishes, worries, and next move must begin with AI의 추정:." }, { role: "user", content: contextText || "아직 확정된 대화가 없습니다." }], text: { format: { type: "json_schema", name: "room_review", strict: true, schema } } }) });
+    const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.6", input: [{ role: "system", content: "You are a neutral Korean relationship conversation mediator. Analyze only the supplied chat. Do not declare winners, blame either participant, diagnose their relationship, or state certainty about inner feelings. The UI labels inferred wishes and worries once, so never repeat 'AI의 추정', a heading, or a disclaimer inside any field. Write compact, scannable Korean: summary is one or two factual sentences; different_points are separate short points about each person's stated standards or requests; wishes_and_worries are separate short inferences; next_move is one or two concrete questions, a small agreement, or a pause-and-return proposal. Do not write paragraphs or long quoted sample messages." }, { role: "user", content: contextText || "아직 확정된 대화가 없습니다." }], text: { format: { type: "json_schema", name: "room_review", strict: true, schema } } }) });
     const payload = await response.json();
     if (!response.ok) throw new Error(`openai_http_${response.status}`);
     const outputText = typeof payload.output_text === "string" ? payload.output_text : payload.output?.flatMap((item: { content?: { type?: string; text?: string }[] }) => item.content ?? []).find((item: { type?: string; text?: string }) => item.type === "output_text" && typeof item.text === "string")?.text;
     const result = JSON.parse(outputText ?? "{}");
-    if (!result.summary) throw new Error("invalid_ai_response");
+    if (typeof result.summary !== "string" || !Array.isArray(result.different_points) || !Array.isArray(result.wishes_and_worries) || typeof result.next_move !== "string") throw new Error("invalid_ai_response");
     await admin.from("ai_analyses").update({ status: "ready", result_type: "normal", result, updated_at: new Date().toISOString() }).eq("id", analysis.id);
     await admin.from("room_review_requests").update({ status: "ready" }).eq("id", requestId);
     return json({ ok: true, data: { analysisId: analysis.id } });

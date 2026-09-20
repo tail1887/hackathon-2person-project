@@ -61,7 +61,12 @@ type ReviewRequest = {
   can_retry: boolean;
   can_cancel: boolean;
 };
-type RoomReview = { id: string; result: ReviewResult; status: "ready" };
+type RoomReview = {
+  id: string;
+  result: ReviewResult;
+  status: "ready";
+  created_at: string;
+};
 type Settlement = {
   id: string;
   status: "open" | "agreed" | "cancelled";
@@ -81,7 +86,10 @@ export function RoomScreen({ roomId }: { roomId: string }) {
   const [position, setPosition] = useState<PositionResult>();
   const [reviewRequest, setReviewRequest] = useState<ReviewRequest>();
   const [roomReview, setRoomReview] = useState<RoomReview>();
+  const [roomReviewHistory, setRoomReviewHistory] = useState<RoomReview[]>([]);
   const [isRoomReviewOpen, setIsRoomReviewOpen] = useState(false);
+  const [isRoomReviewHistoryOpen, setIsRoomReviewHistoryOpen] = useState(false);
+  const [selectedRoomReviewId, setSelectedRoomReviewId] = useState<string>();
   const [toolError, setToolError] = useState<string>();
   const [isToolWorking, setIsToolWorking] = useState(false);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
@@ -117,6 +125,7 @@ export function RoomScreen({ roomId }: { roomId: string }) {
       messagesResult,
       reviewRequestResult,
       roomReviewResult,
+      roomReviewHistoryResult,
       settlementsResult,
       offersResult,
       termsResult,
@@ -150,12 +159,18 @@ export function RoomScreen({ roomId }: { roomId: string }) {
         .maybeSingle(),
       supabase
         .from("room_review_public")
-        .select("id,result,status")
+        .select("id,result,status,created_at")
         .eq("room_id", roomId)
         .eq("status", "ready")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from("room_review_public")
+        .select("id,result,status,created_at")
+        .eq("room_id", roomId)
+        .eq("status", "ready")
+        .order("created_at", { ascending: false }),
       supabase
         .from("settlement_public")
         .select("id,status,active_offer_id")
@@ -228,6 +243,7 @@ export function RoomScreen({ roomId }: { roomId: string }) {
     setRoomReview(
       (roomReviewResult.data ?? undefined) as RoomReview | undefined,
     );
+    setRoomReviewHistory((roomReviewHistoryResult.data ?? []) as RoomReview[]);
     setSettlements((settlementsResult.data ?? []) as Settlement[]);
     setSettlementOffers((offersResult.data ?? []) as SettlementOffer[]);
     setSettlementTerms((termsResult.data ?? []) as SettlementTerm[]);
@@ -677,6 +693,12 @@ export function RoomScreen({ roomId }: { roomId: string }) {
   const myMemberKey = members.find(
     (member) => member.is_self,
   )?.public_member_key;
+  const previousRoomReviews = roomReview
+    ? roomReviewHistory.filter((review) => review.id !== roomReview.id)
+    : [];
+  const selectedHistoricalReview = previousRoomReviews.find(
+    (review) => review.id === selectedRoomReviewId,
+  );
 
   return (
     <main className="app-shell">
@@ -1021,7 +1043,9 @@ export function RoomScreen({ roomId }: { roomId: string }) {
                           <button
                             className="btn btn-sm btn-primary btn-block"
                             disabled={isJudging}
-                            onClick={() => void sendChoice("recommendation", index)}
+                            onClick={() =>
+                              void sendChoice("recommendation", index)
+                            }
                             type="button"
                           >
                             추천 {index + 1} 전송
@@ -1079,7 +1103,9 @@ export function RoomScreen({ roomId }: { roomId: string }) {
                     <h3>현재 대화 형세</h3>
                     <span>AI의 추정</span>
                   </div>
-                  <p className="position-summary-text">{position.current_position}</p>
+                  <p className="position-summary-text">
+                    {position.current_position}
+                  </p>
                 </section>
                 <section className="card position-issues-card">
                   <div className="position-card-title">
@@ -1113,60 +1139,183 @@ export function RoomScreen({ roomId }: { roomId: string }) {
               aria-modal="true"
               aria-label="AI 문철"
             >
-              <div className="sheet-content">
-                <header className="sheet-header">
-                  <h2>⚖️ 함께 보는 AI 문철</h2>
-                  <button
-                    className="btn-icon"
-                    onClick={() => setIsRoomReviewOpen(false)}
-                    type="button"
-                    aria-label="닫기"
-                  >
-                    ✕
-                  </button>
-                </header>
-                <section className="notice-box">
-                  🤝 상대 수락 뒤 생성된, 두 멤버가 함께 보는 공용 요약
-                  브리핑입니다. 승패를 판정하지 않습니다.
-                </section>
-                <section className="card">
-                  <h3>함께 확인할 대화 요약</h3>
-                  <p>{roomReview.result.summary}</p>
-                </section>
-                <section className="card">
-                  <h3>서로 다른 지점 &amp; 바람과 걱정 (AI의 추정)</h3>
-                  <ul>
-                    {roomReview.result.different_points.map((point) => (
-                      <li key={point}>{point}</li>
-                    ))}
-                    {roomReview.result.wishes_and_worries.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </section>
-                <section className="card">
-                  <h3>다음 수 제안</h3>
-                  <p>{roomReview.result.next_move}</p>
-                </section>
-                <div className="sheet-actions">
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => setIsRoomReviewOpen(false)}
-                    type="button"
-                  >
-                    대국방으로
-                  </button>
-                  <button
-                    className="btn btn-outline"
-                    onClick={() => {
-                      setIsRoomReviewOpen(false);
-                      setIsNegotiationOpen(true);
-                    }}
-                    type="button"
-                  >
-                    무승부 제안
-                  </button>
-                </div>
+              <div className="sheet-content room-review-sheet">
+                {isRoomReviewHistoryOpen ? (
+                  <>
+                    <header className="sheet-header">
+                      <h2>🗂 AI 문철 기록</h2>
+                      <button
+                        className="btn-icon"
+                        onClick={() => setIsRoomReviewHistoryOpen(false)}
+                        type="button"
+                        aria-label="현재 문철로 돌아가기"
+                      >
+                        ✕
+                      </button>
+                    </header>
+                    <section className="notice-box">
+                      이전 문철은 읽기 전용입니다. 새 대화를 정리하려면 현재
+                      문철에서 새 신청을 시작하세요.
+                    </section>
+                    <div className="room-review-history-list">
+                      {previousRoomReviews.map((review, index) => (
+                        <button
+                          className={`room-review-history-item ${review.id === selectedRoomReviewId ? "is-selected" : ""}`}
+                          key={review.id}
+                          onClick={() => setSelectedRoomReviewId(review.id)}
+                          type="button"
+                        >
+                          <strong>
+                            문철 {previousRoomReviews.length - index}
+                          </strong>
+                          <span>
+                            {new Date(review.created_at).toLocaleString(
+                              "ko-KR",
+                              {
+                                month: "numeric",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                            )}{" "}
+                            · 읽기 전용
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    {selectedHistoricalReview && (
+                      <section className="room-review-record">
+                        <section className="card room-review-summary-card">
+                          <h3>함께 확인한 대화 요약</h3>
+                          <p>{selectedHistoricalReview.result.summary}</p>
+                        </section>
+                        <section className="card">
+                          <h3>서로 다른 지점</h3>
+                          <ul className="room-review-list">
+                            {selectedHistoricalReview.result.different_points.map(
+                              (point) => (
+                                <li key={point}>{point}</li>
+                              ),
+                            )}
+                          </ul>
+                        </section>
+                        <section className="card">
+                          <div className="position-card-title">
+                            <h3>바람과 걱정</h3>
+                            <span>AI의 추정</span>
+                          </div>
+                          <ul className="room-review-list">
+                            {selectedHistoricalReview.result.wishes_and_worries.map(
+                              (item) => (
+                                <li key={item}>{item}</li>
+                              ),
+                            )}
+                          </ul>
+                        </section>
+                        <section className="card room-review-next-card">
+                          <h3>다음 수 제안</h3>
+                          <p>{selectedHistoricalReview.result.next_move}</p>
+                        </section>
+                      </section>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <header className="sheet-header">
+                      <h2>⚖️ 함께 보는 AI 문철</h2>
+                      <button
+                        className="btn-icon"
+                        onClick={() => setIsRoomReviewOpen(false)}
+                        type="button"
+                        aria-label="닫기"
+                      >
+                        ✕
+                      </button>
+                    </header>
+                    <section className="notice-box">
+                      🤝 상대 수락 뒤 생성된, 두 멤버가 함께 보는 공용 요약
+                      브리핑입니다. 승패를 판정하지 않습니다.
+                    </section>
+                    <section className="card room-review-summary-card">
+                      <h3>함께 확인할 대화 요약</h3>
+                      <p>{roomReview.result.summary}</p>
+                    </section>
+                    <section className="card">
+                      <h3>서로 다른 지점</h3>
+                      <ul className="room-review-list">
+                        {roomReview.result.different_points.map((point) => (
+                          <li key={point}>{point}</li>
+                        ))}
+                      </ul>
+                    </section>
+                    <section className="card">
+                      <div className="position-card-title">
+                        <h3>바람과 걱정</h3>
+                        <span>AI의 추정</span>
+                      </div>
+                      <ul className="room-review-list">
+                        {roomReview.result.wishes_and_worries.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </section>
+                    <section className="card room-review-next-card">
+                      <h3>다음 수 제안</h3>
+                      <p>{roomReview.result.next_move}</p>
+                    </section>
+                    <div className="sheet-actions">
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => setIsRoomReviewOpen(false)}
+                        type="button"
+                      >
+                        대국방으로
+                      </button>
+                      <button
+                        className="btn btn-outline"
+                        onClick={() => {
+                          setIsRoomReviewOpen(false);
+                          setIsNegotiationOpen(true);
+                        }}
+                        type="button"
+                      >
+                        무승부 제안
+                      </button>
+                    </div>
+                    <button
+                      className="btn btn-outline btn-block room-review-secondary-action"
+                      disabled={
+                        isToolWorking ||
+                        room.status !== "active" ||
+                        Boolean(
+                          reviewRequest &&
+                          ["pending", "processing"].includes(
+                            reviewRequest.status,
+                          ),
+                        )
+                      }
+                      onClick={() => {
+                        setIsRoomReviewOpen(false);
+                        void requestRoomReview();
+                      }}
+                      type="button"
+                    >
+                      새 AI 문철 신청하기
+                    </button>
+                    {previousRoomReviews.length > 0 && (
+                      <button
+                        className="btn btn-outline btn-block room-review-secondary-action"
+                        onClick={() => {
+                          setSelectedRoomReviewId(previousRoomReviews[0].id);
+                          setIsRoomReviewHistoryOpen(true);
+                        }}
+                        type="button"
+                      >
+                        🗂 이전 AI 문철 기록 보기
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </section>
           )}
