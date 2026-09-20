@@ -270,9 +270,14 @@ export function Dashboard() {
           ) : (
             <section className="dashboard-grid dashboard-home">
               <div>
-                <h1 className="section-title dashboard-heading">
-                  📌 활성 미션 <span>(우선 표시)</span>
-                </h1>
+                <div className="dashboard-section-heading">
+                  <h1 className="section-title dashboard-heading">
+                    📌 활성 미션 <span>(우선 표시)</span>
+                  </h1>
+                  <Link className="btn btn-sm btn-outline" href="/missions">
+                    기록 보기
+                  </Link>
+                </div>
                 {missions.length === 0 ? (
                   <article className="card empty-card">
                     <p>진행 중인 미션이 없습니다.</p>
@@ -317,14 +322,16 @@ export function Dashboard() {
                     ))}
                   </div>
                 )}
-                <Link className="btn btn-outline btn-block" href="/missions">
-                  미션 기록 보기
-                </Link>
               </div>
               <div>
-                <h1 className="section-title dashboard-heading">
-                  ⚔️ 대국 목록
-                </h1>
+                <div className="dashboard-section-heading">
+                  <h1 className="section-title dashboard-heading">
+                    ⚔️ 대국 목록
+                  </h1>
+                  <Link className="btn btn-sm btn-outline" href="/rooms">
+                    기록 보기
+                  </Link>
+                </div>
                 {isRoomLoading ? (
                   <article className="card empty-card">
                     <p>진행 중인 대국을 불러오는 중…</p>
@@ -350,9 +357,6 @@ export function Dashboard() {
                     <p>진행 중인 대국이 없습니다.</p>
                   </article>
                 )}
-                <Link className="btn btn-outline btn-block" href="/rooms">
-                  대국 기록 보기
-                </Link>
               </div>
               <div className="dashboard-footer-actions">
                 <Link className="btn btn-outline" href="/profile">
