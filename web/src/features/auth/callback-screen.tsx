@@ -20,7 +20,7 @@ export function CallbackScreen() {
     }
     void supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
       if (error) {
-        setMessage("로그인을 완료하지 못했어요. 다시 시도해 주세요.");
+        setMessage(`로그인을 완료하지 못했어요: ${error.message}`);
         return;
       }
       router.replace(destination);
