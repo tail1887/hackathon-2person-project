@@ -63,7 +63,11 @@ export function AuthScreen() {
     setIsSubmitting(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        // 카카오 이메일·사진은 MVP에서 쓰지 않는다. 닉네임만 선택 동의로 요청한다.
+        scopes: provider === "kakao" ? "profile_nickname" : undefined,
+      },
     });
     if (error) {
       setMessage(error.message);
