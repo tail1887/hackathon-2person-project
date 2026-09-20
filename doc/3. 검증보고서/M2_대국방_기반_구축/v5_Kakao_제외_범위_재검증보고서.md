@@ -16,11 +16,12 @@
 | 로그인 UI | `auth-screen.tsx`에서 Kakao 버튼·공급자 호출 제거 | 통과 | `web/src/features/auth/auth-screen.tsx` |
 | Supabase Kakao 공급자 | Kakao enabled 스위치를 끄고 저장한 뒤 다시 열어 비활성 상태 확인 | 통과 | Supabase Auth Providers 운영 대시보드 |
 | 기준 문서 | 기획서·MVP 명세·시스템 데이터 정의·인터페이스·기술 스택·M2 문서 대조 | 통과 | 각 문서의 Google·이메일 인증 범위 |
+| Production 로그인 화면 | `main` 자동 배포 뒤 `/auth` 화면 새로고침 | 통과 | 이메일·비밀번호와 구글 버튼만 표시 |
 | 기존 Kakao 검사 기록 | v3·v4를 삭제하지 않고 과거 검증 이력으로 보존 | 통과 | [v3](v3_인증·프로필_운영_통합_검증보고서.md), [v4](v4_Kakao_동의_항목_재검증보고서.md) |
 
 ## 미검증 항목과 남은 위험
 
-- Google OAuth의 이전 운영 통합 검증은 유효하지만, 이번 UI 제거 뒤 새 Production 배포에서 다시 확인한다.
+- Google OAuth의 이전 운영 통합 검증은 유효하다. 이번 변경 뒤 Production 로그인 화면에서 구글 단일 OAuth 버튼까지 확인했으며, 전체 OAuth 왕복 검증은 기존 v3 기록을 따른다.
 - 이메일·비밀번호 로그인과 미로그인 보존 초대 링크의 운영 검증은 아직 남아 있다.
 - Kakao Developers 앱과 기존 동의 설정은 삭제하지 않았다. 현재 Supabase 공급자와 앱 UI에서만 사용하지 않는다.
 
@@ -28,4 +29,4 @@
 
 - [x] 관련 의사결정 로그 반영 여부 확인
 - [x] 문서·공급자 설정·로그인 UI 대조 근거 기록
-- [ ] 변경 사항을 `main`에 커밋하고 푸시
+- [x] 변경 사항을 `main`에 커밋하고 푸시 (`18cf688`)
