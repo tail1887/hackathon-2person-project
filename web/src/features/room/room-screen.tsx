@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Avatar } from "@/features/profile/avatar";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
 type Room = { id: string; status: "active" | "closed"; room_revision: number };
@@ -68,15 +67,30 @@ export function RoomScreen({ roomId }: { roomId: string }) {
   if (!room && connection === "loading") return <main className="auth-shell"><p className="notice">대국방을 불러오는 중이에요.</p></main>;
   if (!room) return <main className="auth-shell"><section className="auth-card"><p className="eyebrow">대국방</p><h1>대국방을 열 수 없어요</h1><p className="muted">권한을 확인한 뒤 다시 시도해 주세요.</p><Link className="secondary-button room-link-button" href="/">메인으로 돌아가기</Link></section></main>;
 
+  const participantNames = members.map((member) => member.room_display_name).join(" · ");
+
   return <main className="app-shell"><section className="app-frame">
     <header className="app-header"><Link className="app-title" href="/"><span className="app-title-mark">⚖</span>AI 심판</Link><span className={`tag ${room.status === "active" ? "tag-active" : "tag-closed"}`}>{room.status === "active" ? "대국 진행 중" : "대국 종료"}</span></header>
     <div className="app-content room-page">
       {connection === "recovering" && <p className="connection-notice">연결을 복구하는 중이에요. 마지막 대국 기록을 읽기 전용으로 보여드려요.</p>}
       {connection === "failed" && <p className="notice">연결을 복구하지 못했어요. <button className="inline-button" onClick={recover} type="button">다시 시도</button></p>}
-      <div className="page-intro"><p className="eyebrow">두 사람의 대국</p><h1>{members.length === 2 ? "두 사람이 연결됐어요" : "상대를 기다리고 있어요"}</h1><p className="muted">대화 전송은 AI 심판과 함께 다음 단계에서 시작됩니다.</p></div>
-      <section className="member-list" aria-label="대국 멤버">{members.map((member) => <article className="member-card" key={member.public_member_key}><Avatar displayName={member.room_display_name} /><div><strong>{member.room_display_name}</strong><p>{member.role === "creator" ? "대국을 시작한 사람" : "초대로 입장한 사람"}</p></div></article>)}</section>
-      <section className="message-panel"><h2>대국 기록</h2>{messages.length === 0 ? <div className="empty-card"><p>아직 확정된 대화가 없어요.</p><p className="hint">첫 메시지는 AI 심판을 거친 뒤 두 사람에게 같은 순서로 표시됩니다.</p></div> : <ol className="message-list">{messages.map((message) => <li key={message.id}><span>{members.find((member) => member.public_member_key === message.sender_member_key)?.room_display_name ?? "상대"}</span><p>{message.body}</p></li>)}</ol>}</section>
-      <p className="room-revision">공용 상태 #{room.room_revision}</p>
+      <section className="room-summary" aria-label="대국방 요약"><div><p className="room-summary-name">{participantNames || "대국방"}</p><p className="room-summary-sub">{members.length === 2 ? "두 사람이 연결됨" : "상대 입장 대기 중"}</p></div><span className="room-id-label">대국방 #{room.id.slice(0, 8)}</span></section>
+      {members.length < 2 && <p className="connection-notice">상대가 입장하면 대국방이 자동으로 연결됩니다.</p>}
+      <section className="chat-section" aria-label="대국 기록">
+        <h1 className="sr-only">대국방</h1>
+        <div className="chat-container">
+          {messages.length === 0 ? <div className="chat-empty"><p>아직 확정된 대화가 없어요.</p><p className="hint">첫 메시지는 AI 심판을 거친 뒤 두 사람에게 같은 순서로 표시됩니다.</p></div> : <ol className="message-list">{messages.map((message) => <li key={message.id}><span>{members.find((member) => member.public_member_key === message.sender_member_key)?.room_display_name ?? "참여자"}</span><p>{message.body}</p></li>)}</ol>}
+        </div>
+      </section>
+      <section className="chat-bottom" aria-label="대국 도구와 메시지 초안">
+        <div className="chat-tools">
+          <button className="tool-button" disabled type="button">📊 형세 파악</button>
+          <button className="tool-button" disabled type="button">⚖️ AI 문철</button>
+          <button className="tool-button tool-button-outline" disabled type="button">🤝 무승부 제안</button>
+        </div>
+        <div className="chat-input-row"><textarea aria-label="메시지 초안" disabled placeholder="AI 심판 전송 기능은 M3에서 시작됩니다." rows={2} /><button className="primary-button" disabled type="button">확인</button></div>
+        <p className="chat-boundary-note">초안 작성 뒤 AI 심판을 거친 메시지만 전송됩니다.</p>
+      </section>
     </div>
   </section></main>;
 }
