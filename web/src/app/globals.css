@@ -1075,9 +1075,48 @@ input:focus {
 }
 .selection-condition {
   cursor: pointer;
+  display: block;
+  padding: 0;
+  overflow: hidden;
 }
-.selection-condition input {
-  margin-right: 6px;
+.selection-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+}
+.selection-row input[type="radio"],
+.selection-row input[type="checkbox"] {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  accent-color: var(--primary);
+}
+.selection-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+.selection-copy strong {
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.selection-responsibility {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+.selection-condition:has(input:checked) {
+  border-color: var(--primary);
+  background: #eef2ff;
+}
+.selection-condition:has(input:checked) .selection-responsibility {
+  color: #4338ca;
 }
 .form-group {
   margin-top: 14px;

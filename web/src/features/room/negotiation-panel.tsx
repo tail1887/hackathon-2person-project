@@ -362,31 +362,35 @@ export function NegotiationPanel({
                   className="negotiation-condition selection-condition"
                   key={term.id}
                 >
-                  <input
-                    checked={selected.includes(term.id)}
-                    name="term-selection"
-                    onChange={() =>
-                      setSelected((current) =>
-                        offer.selection_mode === "single"
-                          ? [term.id]
-                          : current.includes(term.id)
-                            ? current.filter((id) => id !== term.id)
-                            : [...current, term.id],
-                      )
-                    }
-                    type={
-                      offer.selection_mode === "single" ? "radio" : "checkbox"
-                    }
-                  />{" "}
-                  <strong>{term.text}</strong>
-                  <p>
-                    책임 주체:{" "}
-                    {term.mission_kind === "joint"
-                      ? "함께"
-                      : term.responsible_member_key === myMemberKey
-                        ? "나"
-                        : "상대"}
-                  </p>
+                  <span className="selection-row">
+                    <input
+                      checked={selected.includes(term.id)}
+                      name="term-selection"
+                      onChange={() =>
+                        setSelected((current) =>
+                          offer.selection_mode === "single"
+                            ? [term.id]
+                            : current.includes(term.id)
+                              ? current.filter((id) => id !== term.id)
+                              : [...current, term.id],
+                        )
+                      }
+                      type={
+                        offer.selection_mode === "single" ? "radio" : "checkbox"
+                      }
+                    />
+                    <span className="selection-copy">
+                      <strong>{term.text}</strong>
+                      <span className="selection-responsibility">
+                        책임 주체:{" "}
+                        {term.mission_kind === "joint"
+                          ? "함께"
+                          : term.responsible_member_key === myMemberKey
+                            ? "나"
+                            : "상대"}
+                      </span>
+                    </span>
+                  </span>
                 </label>
               ))}
             </div>
