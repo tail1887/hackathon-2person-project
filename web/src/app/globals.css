@@ -271,6 +271,8 @@ input:focus {
 .tag-pending {
   background: #fef3c7;
   color: #b45309;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .tag-active {
   background: #dcfce7;
@@ -1063,6 +1065,18 @@ input:focus {
   border-radius: 8px;
   background: #fafafa;
   font-size: 0.84rem;
+}
+.read-only-condition-title {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  color: var(--text);
+  line-height: 1.45;
+}
+.read-only-condition-title span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .negotiation-condition p {
   margin: 0;

@@ -97,7 +97,10 @@ export function NegotiationPanel({
       ) : (
         terms.map((term) => (
           <div className="negotiation-condition" key={term.id}>
-            <strong>조건 {term.display_order + 1}</strong> · {term.text}
+            <div className="read-only-condition-title">
+              <strong>조건 {term.display_order + 1}</strong>
+              <span>· {term.text}</span>
+            </div>
             <p>
               책임 주체:{" "}
               {term.mission_kind === "joint"
