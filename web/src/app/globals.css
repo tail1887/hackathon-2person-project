@@ -19,3 +19,39 @@ h1, h2, h3, p { margin-top: 0; } h1 { margin-bottom: 8px; font-size: 1.55rem; le
 .tool-sheet { display: grid; gap: 8px; margin-top: 12px; padding: 13px; border: 1px solid #ddd6fe; border-radius: 12px; background: #faf5ff; }.tool-sheet p { margin: 0; color: var(--text-muted); font-size: .84rem; line-height: 1.5; }.tool-sheet .primary-button { justify-self: start; }.review-open-button { width: 100%; margin-top: 12px; border: 1px solid #c7d2fe; border-radius: 9px; padding: 10px; background: #eef2ff; color: var(--primary); font-weight: 800; }.analysis-dialog { position: fixed; z-index: 20; inset: 0; display: grid; align-items: end; background: rgba(17, 24, 39, .42); }.analysis-card { position: relative; max-height: min(78vh, 620px); overflow: auto; border-radius: 20px 20px 0 0; padding: 24px 20px 30px; background: #fff; box-shadow: 0 -8px 30px rgba(0,0,0,.14); }.analysis-card h2 { padding-right: 28px; font-size: 1.16rem; }.analysis-card h3 { margin: 18px 0 6px; font-size: .9rem; }.analysis-card p, .analysis-card li { color: #4b5563; font-size: .9rem; line-height: 1.55; }.analysis-card ul { display: grid; gap: 7px; margin: 0; padding-left: 20px; }.dialog-close { position: absolute; top: 14px; right: 14px; display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 50%; background: #f3f4f6; color: var(--secondary); font-size: 1.3rem; }
 .profile-page .auth-card { padding: 0; } .profile-page-header { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); } .icon-button { display: grid; width: 34px; height: 34px; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--secondary); text-decoration: none; } .icon-button:hover { background: #f3f4f6; } .profile-content { padding: 22px; } .avatar-preview { display: grid; justify-items: center; gap: 12px; padding: 4px 0 18px; text-align: center; color: var(--text-muted); font-size: .88rem; } .button-row { display: flex; justify-content: flex-end; gap: 10px; }
 @media (max-width: 520px) { .auth-shell, .app-shell { padding: 0; } .auth-card, .app-frame { min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; } .auth-card { display: grid; align-content: center; } }
+
+/* `mockup/`의 서비스 화면 스타일을 실제 대국방에 이관한다. 테스트 도구 UI는 포함하지 않는다. */
+.mockup-app-frame { display: flex; flex-direction: column; }
+.btn-icon, .btn-icon-placeholder { display: grid; width: 28px; height: 28px; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--secondary); font-size: 1.1rem; text-decoration: none; }
+.btn-icon:hover { background: #f3f4f6; }
+.btn-icon-placeholder { visibility: hidden; }
+.mockup-room-page { padding-top: 18px; }
+.mockup-room-summary { margin-bottom: 8px; border-radius: 12px; }
+.mockup-room-summary .room-summary-name { margin-right: 5px; }
+.notice-box, .warning-box { margin: 0 0 12px; border-radius: 8px; padding: 10px 12px; font-size: .82rem; line-height: 1.45; }
+.notice-box { border: 1px solid #bfdbfe; background: #eff6ff; color: #1e40af; }
+.warning-box { border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; }
+.room-review-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.room-review-banner .btn { margin-left: auto; }
+.chat-container { display: flex; flex: 1; flex-direction: column; gap: 10px; overflow-y: auto; }
+.msg-bubble { max-width: 80%; padding: 10px 14px; border: 0; border-radius: 14px; font-size: .88rem; line-height: 1.4; }
+.msg-bubble p { margin: 0; white-space: pre-wrap; }
+.msg-left { align-self: flex-start; border-bottom-left-radius: 2px; background: #f3f4f6; color: #1f2937; }
+.msg-right { align-self: flex-end; border-bottom-right-radius: 2px; background: var(--primary); color: white; }
+.msg-sender { margin-bottom: 3px !important; color: inherit; font-size: .72rem; font-weight: 700; opacity: .75; }
+.chat-bottom { display: flex; flex-direction: column; gap: 8px; }
+.chat-tools { gap: 6px; }
+.btn { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 8px; padding: 8px 12px; font-size: .9rem; font-weight: 600; text-decoration: none; }
+.btn-primary { background: var(--primary); color: white; }.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-secondary { border: 1px solid #d1d5db; background: #f3f4f6; color: #374151; }.btn-outline { border: 1px solid var(--primary); background: transparent; color: var(--primary); }
+.btn-sm { min-height: 31px; padding: 5px 8px; border-radius: 6px; font-size: .8rem; }.btn-block { width: 100%; }
+.chat-confirm-button { min-width: 60px; }
+.sheet-overlay { position: fixed; z-index: 50; inset: 0; display: none; flex-direction: column; justify-content: flex-end; background: rgba(0, 0, 0, .5); }
+.sheet-overlay.active { display: flex; }
+.sheet-content { max-height: 85%; overflow-y: auto; border-radius: 20px 20px 0 0; padding: 20px; background: white; box-shadow: 0 -4px 20px rgba(0,0,0,.15); }
+.sheet-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }.sheet-header h2 { margin: 0; font-size: 1.1rem; }
+.sheet-draft-preview { margin: 0 0 10px; color: var(--text-muted); font-size: .82rem; line-height: 1.45; }.sheet-draft-preview::first-line { color: var(--text-muted); }
+.sheet-content .card { margin-bottom: 10px; }.sheet-content .card h3 { margin: 0 0 6px; font-size: .95rem; }.sheet-content .card p, .sheet-content .card li { color: var(--text-muted); font-size: .82rem; line-height: 1.5; }.sheet-content .card ul { margin: 6px 0 0; padding-left: 18px; }
+.ai-risk-card { border-left: 4px solid var(--primary); background: #fafafa; }.ai-risk-card strong { color: var(--primary); font-size: .85rem; }.ai-risk-card p { margin: 5px 0 0; }
+.sheet-section-title { margin: 12px 0 6px; font-size: .85rem; }.recommendation-card { padding: 10px; }.recommendation-card p { margin: 0 0 6px; color: var(--text); }
+.sheet-actions { display: flex; gap: 8px; margin-top: 14px; }.sheet-actions .btn { flex: 1; }
