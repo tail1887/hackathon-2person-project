@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { getFunctionErrorMessage } from "@/lib/supabase/function-error";
+import { NegotiationPanel, type CounterMessage, type SettlementOffer, type SettlementTerm } from "./negotiation-panel";
 
 type Room = { id: string; status: "active" | "closed"; room_revision: number };
-type Member = { room_id: string; role: "creator" | "invitee"; public_member_key: string; room_display_name: string };
+type Member = { room_id: string; role: "creator" | "invitee"; public_member_key: string; room_display_name: string; is_self: boolean };
 type Message = { id: string; room_id: string; sender_member_key: string; body: string; sequence: number; sent_at: string };
 type ConnectionState = "loading" | "connected" | "recovering" | "failed";
 type JudgeResult = { result_type: "normal" | "restricted"; risk: string; inference: string; recommendations: { text: string }[] };
@@ -14,6 +15,7 @@ type PositionResult = { current_position: string; issues: string[]; next_move: s
 type ReviewResult = { summary: string; different_points: string[]; wishes_and_worries: string[]; next_move: string };
 type ReviewRequest = { id: string; status: "pending" | "processing" | "ready" | "failed" | "cancelled"; is_requester: boolean; is_responder: boolean; can_retry: boolean; can_cancel: boolean };
 type RoomReview = { id: string; result: ReviewResult; status: "ready" };
+type Settlement = { id: string; status: "open" | "agreed" | "cancelled"; active_offer_id: string | null };
 
 export function RoomScreen({ roomId }: { roomId: string }) {
   const supabase = getBrowserSupabase();
@@ -31,17 +33,28 @@ export function RoomScreen({ roomId }: { roomId: string }) {
   const [isRoomReviewOpen, setIsRoomReviewOpen] = useState(false);
   const [toolError, setToolError] = useState<string>();
   const [isToolWorking, setIsToolWorking] = useState(false);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [settlementOffers, setSettlementOffers] = useState<SettlementOffer[]>([]);
+  const [settlementTerms, setSettlementTerms] = useState<SettlementTerm[]>([]);
+  const [counterMessages, setCounterMessages] = useState<CounterMessage[]>([]);
+  const [isNegotiationOpen, setIsNegotiationOpen] = useState(false);
+  const [isSettlementWorking, setIsSettlementWorking] = useState(false);
+  const [settlementError, setSettlementError] = useState<string>();
   const latestRevision = useRef(0);
   const recovering = useRef(false);
 
   const loadSnapshot = useCallback(async () => {
     if (!supabase) return false;
-    const [roomResult, membersResult, messagesResult, reviewRequestResult, roomReviewResult] = await Promise.all([
+    const [roomResult, membersResult, messagesResult, reviewRequestResult, roomReviewResult, settlementsResult, offersResult, termsResult, countersResult] = await Promise.all([
       supabase.from("room_public").select("id,status,room_revision").eq("id", roomId).maybeSingle(),
       supabase.from("room_member_public").select("room_id,role,public_member_key,room_display_name").eq("room_id", roomId),
       supabase.from("room_message_public").select("id,room_id,sender_member_key,body,sequence,sent_at").eq("room_id", roomId).order("sequence"),
       supabase.from("room_review_request_public").select("id,status,is_requester,is_responder,can_retry,can_cancel").eq("room_id", roomId).order("requested_at", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("room_review_public").select("id,result,status").eq("room_id", roomId).eq("status", "ready").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("settlement_public").select("id,status,active_offer_id").eq("room_id", roomId).order("created_at", { ascending: false }).limit(1),
+      supabase.from("settlement_offer_public").select("id,revision,proposer_member_key,selection_mode,status").eq("room_id", roomId).order("revision"),
+      supabase.from("settlement_term_public").select("id,offer_id,text,mission_kind,responsible_member_key,display_order").eq("room_id", roomId).order("display_order"),
+      supabase.from("settlement_counter_message_public").select("id,offer_id,author_member_key,body").eq("room_id", roomId),
     ]);
     if (roomResult.error || !roomResult.data || membersResult.error || messagesResult.error) return false;
     const nextRoom = roomResult.data as Room;
@@ -50,6 +63,7 @@ export function RoomScreen({ roomId }: { roomId: string }) {
     setRoom(nextRoom); setMembers((membersResult.data ?? []) as Member[]); setMessages((messagesResult.data ?? []) as Message[]);
     setReviewRequest((reviewRequestResult.data ?? undefined) as ReviewRequest | undefined);
     setRoomReview((roomReviewResult.data ?? undefined) as RoomReview | undefined);
+    setSettlements((settlementsResult.data ?? []) as Settlement[]); setSettlementOffers((offersResult.data ?? []) as SettlementOffer[]); setSettlementTerms((termsResult.data ?? []) as SettlementTerm[]); setCounterMessages((countersResult.data ?? []) as CounterMessage[]);
     return true;
   }, [roomId, supabase]);
 
@@ -128,6 +142,35 @@ export function RoomScreen({ roomId }: { roomId: string }) {
     await loadSnapshot();
   }
 
+  async function createSettlement(selectionMode: "single" | "multiple" | "none", terms: { text: string; responsibility: "proposer" | "responder" | "together" }[]) {
+    if (!supabase) return; setIsSettlementWorking(true); setSettlementError(undefined);
+    const { data, error } = await supabase.rpc("create_settlement_offer", { p_room_id: roomId, p_selection_mode: selectionMode, p_terms: terms }); const result = data?.[0];
+    setIsSettlementWorking(false);
+    if (error || !result || result.error_code) { setSettlementError("무승부 제안을 저장하지 못했어요. 조건을 확인해 다시 시도해 주세요."); return; }
+    await loadSnapshot();
+  }
+  async function counterSettlement(body: string) {
+    if (!supabase || !activeOffer) return; setIsSettlementWorking(true); setSettlementError(undefined);
+    const { data, error } = await supabase.rpc("counter_settlement_offer", { p_offer_id: activeOffer.id, p_body: body }); const result = data?.[0];
+    setIsSettlementWorking(false);
+    if (error || !result || result.error_code) { setSettlementError("카운터오퍼를 보내지 못했어요. 다시 시도해 주세요."); return; }
+    await loadSnapshot();
+  }
+  async function continueSettlement() {
+    if (!supabase || !activeOffer) return; setIsSettlementWorking(true); setSettlementError(undefined);
+    const { data, error } = await supabase.rpc("continue_after_settlement_offer", { p_offer_id: activeOffer.id }); const result = data?.[0];
+    setIsSettlementWorking(false);
+    if (error || !result || result.error_code) { setSettlementError("협상을 종료하지 못했어요. 다시 시도해 주세요."); return; }
+    setIsNegotiationOpen(false); await loadSnapshot();
+  }
+  async function acceptSettlement(termIds: string[]) {
+    if (!supabase || !activeOffer) return; setIsSettlementWorking(true); setSettlementError(undefined);
+    const { data, error } = await supabase.rpc("accept_settlement_offer", { p_offer_id: activeOffer.id, p_term_ids: termIds }); const result = data?.[0];
+    setIsSettlementWorking(false);
+    if (error || !result || result.error_code) { setSettlementError("조건 선택을 확인한 뒤 다시 수락해 주세요."); return; }
+    setIsNegotiationOpen(false); await loadSnapshot();
+  }
+
   useEffect(() => {
     if (!supabase) return;
     let disposed = false;
@@ -139,6 +182,9 @@ export function RoomScreen({ roomId }: { roomId: string }) {
       .on("broadcast", { event: "room.member_joined" }, () => void loadSnapshot())
       .on("broadcast", { event: "message.sent" }, () => void loadSnapshot())
       .on("broadcast", { event: "room.review_changed" }, () => void loadSnapshot())
+      .on("broadcast", { event: "settlement.offer_changed" }, () => void loadSnapshot())
+      .on("broadcast", { event: "settlement.cancelled" }, () => void loadSnapshot())
+      .on("broadcast", { event: "settlement.agreed" }, () => void loadSnapshot())
       .subscribe((status) => {
         if (disposed) return;
         if (status === "SUBSCRIBED") { void loadSnapshot().then((loaded) => loaded ? setConnection("connected") : recover()); }
@@ -152,6 +198,11 @@ export function RoomScreen({ roomId }: { roomId: string }) {
   if (!room) return <main className="auth-shell"><section className="auth-card"><p className="eyebrow">대국방</p><h1>대국방을 열 수 없어요</h1><p className="muted">권한을 확인한 뒤 다시 시도해 주세요.</p><Link className="secondary-button room-link-button" href="/">메인으로 돌아가기</Link></section></main>;
 
   const participantNames = members.map((member) => member.room_display_name).join(" · ");
+  const latestSettlement = settlements[0];
+  const activeOffer = latestSettlement?.active_offer_id ? settlementOffers.find((offer) => offer.id === latestSettlement.active_offer_id) : undefined;
+  const activeTerms = activeOffer ? settlementTerms.filter((term) => term.offer_id === activeOffer.id) : [];
+  const activeCounter = activeOffer ? counterMessages.find((message) => message.offer_id === activeOffer.id) : undefined;
+  const myMemberKey = members.find((member) => member.is_self)?.public_member_key;
 
   return <main className="app-shell"><section className="app-frame mockup-app-frame">
     <header className="app-header"><span className="btn-icon-placeholder" aria-hidden="true">←</span><span className="app-title"><span aria-hidden="true">⚖️</span> AI 심판</span><Link aria-label="메인으로 돌아가기" className="btn-icon" href="/">🏠</Link></header>
@@ -160,6 +211,7 @@ export function RoomScreen({ roomId }: { roomId: string }) {
       {connection === "failed" && <p className="notice">연결을 복구하지 못했어요. <button className="inline-button" onClick={recover} type="button">다시 시도</button></p>}
       <section className="room-summary mockup-room-summary" aria-label="대국방 요약"><div><span className="room-summary-name">{participantNames || "대국방"}</span> <span className={`tag ${room.status === "active" ? "tag-active" : "tag-closed"}`}>{room.status === "active" ? "진행 중" : "종료됨"}</span></div><span className="room-id-label">방번호 #{room.id.slice(0, 8)}</span></section>
       {members.length < 2 && <p className="connection-notice">상대가 입장하면 대국방이 자동으로 연결됩니다.</p>}
+      {activeOffer && room.status === "active" && <section className="notice-box room-review-banner"><strong>🤝 무승부 제안 진행 중:</strong><span>{activeOffer.proposer_member_key === myMemberKey ? activeOffer.status === "counter_requested" ? " 카운터오퍼가 도착했습니다. 제안을 수정할 수 있습니다." : " 상대방의 수락/카운터오퍼 대기 중" : activeOffer.status === "counter_requested" ? " 카운터오퍼를 보냈습니다. 상대의 수정 제안을 기다리고 있어요." : " 상대방의 무승부 제안이 도착했습니다."}</span><button className="btn btn-sm btn-outline" onClick={() => setIsNegotiationOpen(true)} type="button">보기</button></section>}
       {reviewRequest?.status === "pending" && <section className="notice-box room-review-banner"><strong>{reviewRequest.is_responder ? "AI 문철 신청이 도착했어요" : "AI 문철 신청을 보냈어요"}</strong><span>{reviewRequest.is_responder ? " 두 사람이 함께 확인할 공용 문철을 만들까요?" : " 상대의 수락을 기다리고 있어요."}</span>{reviewRequest.is_responder && <button className="btn btn-sm btn-primary" disabled={isToolWorking} onClick={acceptRoomReview} type="button">동의하고 시작</button>}</section>}
       {reviewRequest?.status === "processing" && <section className="notice-box room-review-banner"><strong>AI 문철을 준비하고 있어요</strong><span> 두 사람의 대화를 함께 정리하는 중이에요.</span></section>}
       {reviewRequest?.status === "failed" && <section className="warning-box room-review-banner"><strong>AI 문철을 준비하지 못했어요</strong><p>분석 내용은 저장하거나 보여 주지 않았어요. {reviewRequest.is_requester ? "같은 대화 기준으로 한 번만 다시 시도하거나 취소할 수 있어요." : "신청자가 다시 시도하거나 새 신청을 만들 수 있어요."}</p>{reviewRequest.is_requester && <div className="sheet-actions">{reviewRequest.can_retry && <button className="btn btn-primary" disabled={isToolWorking} onClick={retryRoomReview} type="button">다시 시도</button>}{reviewRequest.can_cancel && <button className="btn btn-secondary" disabled={isToolWorking} onClick={cancelRoomReview} type="button">취소</button>}</div>}</section>}
@@ -173,7 +225,8 @@ export function RoomScreen({ roomId }: { roomId: string }) {
         <div className="chat-tools">
           <button className="btn btn-sm btn-secondary" disabled={isToolWorking || room.status !== "active"} onClick={requestPosition} type="button">📊 형세 파악</button>
           <button className="btn btn-sm btn-secondary" disabled={isToolWorking || room.status !== "active" || members.length < 2 || Boolean(reviewRequest && ["pending", "processing"].includes(reviewRequest.status))} onClick={roomReview ? () => setIsRoomReviewOpen(true) : requestRoomReview} type="button">⚖️ {roomReview ? "AI 문철 확인하기" : "AI 문철 신청하기"}</button>
-          <button className="btn btn-sm btn-outline" disabled title="무승부 협상은 M4에서 제공됩니다." type="button">🤝 무승부 제안</button>
+          {latestSettlement && <button className="btn btn-sm btn-outline" onClick={() => setIsNegotiationOpen(true)} type="button">🗂 협상 기록</button>}
+          <button className="btn btn-sm btn-outline" disabled={room.status !== "active" || members.length < 2 || isSettlementWorking || Boolean(activeOffer)} onClick={() => setIsNegotiationOpen(true)} type="button">🤝 무승부 제안</button>
         </div>
         <div className="chat-input-row"><textarea aria-label="메시지 초안" onChange={(event) => { setDraft(event.target.value); setJudge(undefined); }} placeholder="초안 메시지를 입력하세요... (확인을 누르면 AI 심판이 열립니다)" rows={2} value={draft} /><button className="btn btn-primary chat-confirm-button" disabled={isJudging || !draft.trim() || room.status !== "active"} onClick={requestJudge} type="button">{isJudging ? "확인 중…" : "확인"}</button></div>
         <p className="chat-boundary-note">* 초안 작성 후 [확인]을 누르면 AI 심판 시트가 필수 개시됩니다. (직접 전송 불가)</p>
@@ -182,7 +235,8 @@ export function RoomScreen({ roomId }: { roomId: string }) {
       </section>
       {judge && <section className="sheet-overlay active" role="dialog" aria-modal="true" aria-label="AI 심판 결과"><div className="sheet-content"><header className="sheet-header"><h2>⚖️ AI 심판 결과</h2><button className="btn-icon" onClick={() => setJudge(undefined)} type="button" aria-label="닫기">✕</button></header><p className="sheet-draft-preview">입력 초안: “{draft}”</p>{judge.result.result_type === "restricted" ? <><section className="warning-box"><strong>⛔ Restricted AI 분석</strong><br />{judge.result.risk}</section><button className="btn btn-primary btn-block" onClick={() => setJudge(undefined)} type="button">초안 수정하러 가기</button></> : <><section className="card ai-risk-card"><strong>⚠️ 이 수의 위험 &amp; 숨은 감정 (AI의 추정)</strong><p>{judge.result.risk} {judge.result.inference}</p></section><p className="section-title sheet-section-title">💡 AI 추천 메시지</p>{judge.result.recommendations.map((recommendation, index) => <section className="card recommendation-card" key={`${recommendation.text}-${index}`}><p>“{recommendation.text}”</p><button className="btn btn-sm btn-primary btn-block" disabled={isJudging} onClick={() => void sendChoice("recommendation")} type="button">추천 {index + 1} 전송</button></section>)}<div className="sheet-actions"><button className="btn btn-secondary" onClick={() => setJudge(undefined)} type="button">초안 수정</button><button className="btn btn-outline" disabled={isJudging} onClick={() => void sendChoice("original")} type="button">원문 전송</button></div></>}</div></section>}
       {position && <section className="sheet-overlay active" role="dialog" aria-modal="true" aria-label="개인 형세 파악"><div className="sheet-content"><header className="sheet-header"><h2>📊 개인 형세 파악 (비공개)</h2><button className="btn-icon" onClick={() => setPosition(undefined)} type="button" aria-label="닫기">✕</button></header><section className="notice-box">🔒 본 결과는 요청자 본인에게만 제공되며 상대방에게는 노출되지 않습니다.</section><section className="card"><h3>현재 대화 형세</h3><p>{position.current_position}</p></section><section className="card"><h3>내가 확인할 쟁점 &amp; AI 추정</h3><ul>{position.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul><h3>다음 판단</h3><p>{position.next_move}</p></section><button className="btn btn-primary btn-block" onClick={() => setPosition(undefined)} type="button">대국방으로 돌아가기</button></div></section>}
-      {isRoomReviewOpen && roomReview?.result && <section className="sheet-overlay active" role="dialog" aria-modal="true" aria-label="AI 문철"><div className="sheet-content"><header className="sheet-header"><h2>⚖️ 함께 보는 AI 문철</h2><button className="btn-icon" onClick={() => setIsRoomReviewOpen(false)} type="button" aria-label="닫기">✕</button></header><section className="notice-box">🤝 상대 수락 뒤 생성된, 두 멤버가 함께 보는 공용 요약 브리핑입니다. 승패를 판정하지 않습니다.</section><section className="card"><h3>함께 확인할 대화 요약</h3><p>{roomReview.result.summary}</p></section><section className="card"><h3>서로 다른 지점 &amp; 바람과 걱정 (AI의 추정)</h3><ul>{roomReview.result.different_points.map((point) => <li key={point}>{point}</li>)}{roomReview.result.wishes_and_worries.map((item) => <li key={item}>{item}</li>)}</ul></section><section className="card"><h3>다음 수 제안</h3><p>{roomReview.result.next_move}</p></section><div className="sheet-actions"><button className="btn btn-secondary" onClick={() => setIsRoomReviewOpen(false)} type="button">대국방으로</button><button className="btn btn-outline" disabled title="무승부 협상은 M4에서 제공됩니다." type="button">무승부 제안</button></div></div></section>}
+      {isRoomReviewOpen && roomReview?.result && <section className="sheet-overlay active" role="dialog" aria-modal="true" aria-label="AI 문철"><div className="sheet-content"><header className="sheet-header"><h2>⚖️ 함께 보는 AI 문철</h2><button className="btn-icon" onClick={() => setIsRoomReviewOpen(false)} type="button" aria-label="닫기">✕</button></header><section className="notice-box">🤝 상대 수락 뒤 생성된, 두 멤버가 함께 보는 공용 요약 브리핑입니다. 승패를 판정하지 않습니다.</section><section className="card"><h3>함께 확인할 대화 요약</h3><p>{roomReview.result.summary}</p></section><section className="card"><h3>서로 다른 지점 &amp; 바람과 걱정 (AI의 추정)</h3><ul>{roomReview.result.different_points.map((point) => <li key={point}>{point}</li>)}{roomReview.result.wishes_and_worries.map((item) => <li key={item}>{item}</li>)}</ul></section><section className="card"><h3>다음 수 제안</h3><p>{roomReview.result.next_move}</p></section><div className="sheet-actions"><button className="btn btn-secondary" onClick={() => setIsRoomReviewOpen(false)} type="button">대국방으로</button><button className="btn btn-outline" onClick={() => { setIsRoomReviewOpen(false); setIsNegotiationOpen(true); }} type="button">무승부 제안</button></div></div></section>}
+      {isNegotiationOpen && <section className="sheet-overlay active negotiation-overlay" role="dialog" aria-modal="true" aria-label="조건부 무승부 협상"><div className="sheet-content negotiation-sheet"><button className="btn-icon negotiation-close" onClick={() => setIsNegotiationOpen(false)} type="button" aria-label="대국방으로 돌아가기">✕</button><NegotiationPanel counter={activeCounter} error={settlementError} history={settlementOffers} myMemberKey={myMemberKey} offer={activeOffer} onAccept={(termIds) => void acceptSettlement(termIds)} onBack={() => setIsNegotiationOpen(false)} onContinue={() => void continueSettlement()} onCounter={(body) => void counterSettlement(body)} onCreate={(selectionMode, terms) => void createSettlement(selectionMode, terms)} terms={activeTerms} working={isSettlementWorking} /></div></section>}
     </div>
   </section></main>;
 }
