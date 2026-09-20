@@ -1380,6 +1380,9 @@ input:focus {
   margin-top: 14px;
   justify-content: flex-end;
 }
+.history-list { display: grid; gap: 8px; }
+.history-card { display: grid; gap: 5px; color: var(--text); text-decoration: none; }
+.history-card span { color: var(--text-muted); font-size: 0.82rem; }
 .mission-change-offer {
   margin-top: 14px;
 }

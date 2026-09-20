@@ -317,6 +317,9 @@ export function Dashboard() {
                     ))}
                   </div>
                 )}
+                <Link className="btn btn-outline btn-block" href="/missions">
+                  미션 기록 보기
+                </Link>
               </div>
               <div>
                 <h1 className="section-title dashboard-heading">
@@ -347,6 +350,9 @@ export function Dashboard() {
                     <p>진행 중인 대국이 없습니다.</p>
                   </article>
                 )}
+                <Link className="btn btn-outline btn-block" href="/rooms">
+                  대국 기록 보기
+                </Link>
               </div>
               <div className="dashboard-footer-actions">
                 <Link className="btn btn-outline" href="/profile">
