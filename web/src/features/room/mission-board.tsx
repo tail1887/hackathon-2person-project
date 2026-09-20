@@ -206,20 +206,17 @@ export function MissionBoard({
       <article className="card mission-detail">
         <div className="mission-detail-heading">
           <div>
-            <h2>
-              {selected.kind === "joint" ? "🤝 공동 퀘스트" : "🎯 개인 미션"}
-            </h2>
+            <h2>{selected.text}</h2>
             <p className="mission-meta">
               {selected.kind === "joint"
-                ? "참여자: 두 사람"
-                : `수행자: ${memberName(selected.owner_member_key, members)}`}
+                ? `공동 퀘스트 · 완료: ${currentActions.filter((action) => action.type === "joint_checkin").length}/2`
+                : `개인 미션 · 수행자: ${memberName(selected.owner_member_key, members)}`}
             </p>
           </div>
-          <span className={`tag mission-status mission-${selected.status}`}>
-            {statusLabel[selected.status]}
+          <span className="tag tag-active">
+            {selected.kind === "joint" ? "공동 퀘스트" : "개인 미션"}
           </span>
         </div>
-        <p className="mission-text">{selected.text}</p>
         <p className="hint">
           {selected.kind === "joint"
             ? "두 사람이 모두 체크하면 완료됩니다."
@@ -231,7 +228,7 @@ export function MissionBoard({
           <div className="mission-actions">
             {isOwner && selected.status === "in_progress" && (
               <button
-                className="btn btn-primary"
+                className="btn btn-sm btn-primary"
                 disabled={working}
                 onClick={() => onAction(selected.id, "complete_request")}
                 type="button"
@@ -242,7 +239,7 @@ export function MissionBoard({
             {!isOwner && selected.status === "completion_requested" && (
               <>
                 <button
-                  className="btn btn-primary"
+                  className="btn btn-sm btn-primary"
                   disabled={working}
                   onClick={() => onAction(selected.id, "confirm")}
                   type="button"
@@ -250,7 +247,7 @@ export function MissionBoard({
                   수행 확인
                 </button>
                 <button
-                  className="btn btn-outline"
+                  className="btn btn-sm btn-outline"
                   disabled={working}
                   onClick={() => onAction(selected.id, "request_revision")}
                   type="button"
@@ -261,7 +258,7 @@ export function MissionBoard({
             )}
             {isOwner && selected.status === "revision_requested" && (
               <button
-                className="btn btn-primary"
+                className="btn btn-sm btn-primary"
                 disabled={working}
                 onClick={() => onAction(selected.id, "resume")}
                 type="button"
@@ -274,7 +271,7 @@ export function MissionBoard({
                 selected.status,
               ) && (
                 <button
-                  className="btn btn-outline"
+                  className="btn btn-sm btn-outline"
                   disabled={working}
                   onClick={() => onAction(selected.id, "abandon")}
                   type="button"
@@ -288,7 +285,7 @@ export function MissionBoard({
           <div className="mission-actions">
             {selected.status === "in_progress" && isParticipant && (
               <button
-                className="btn btn-primary"
+                className="btn btn-sm btn-primary"
                 disabled={working || checkedIn}
                 onClick={() => onAction(selected.id, "joint_checkin")}
                 type="button"
@@ -298,7 +295,7 @@ export function MissionBoard({
             )}
             {selected.status === "in_progress" && isParticipant && (
               <button
-                className="btn btn-outline"
+                className="btn btn-sm btn-outline"
                 disabled={working}
                 onClick={() => onAction(selected.id, "abandon")}
                 type="button"
@@ -351,7 +348,7 @@ export function MissionBoard({
         ) : (
           ["in_progress", "revision_requested"].includes(selected.status) && (
             <button
-              className="btn btn-secondary btn-block"
+              className="btn btn-sm btn-outline"
               disabled={working}
               onClick={() => beginEdit(selected)}
               type="button"

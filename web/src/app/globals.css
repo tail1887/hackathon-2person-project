@@ -1058,19 +1058,12 @@ input:focus {
 }
 .mission-detail-heading h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.02rem;
 }
 .mission-meta {
   margin: 5px 0 0;
   color: var(--text-muted);
   font-size: 0.8rem;
-}
-.mission-detail .mission-text {
-  margin: 14px 0 6px;
-  color: var(--text);
-  font-size: 1.05rem;
-  font-weight: 700;
-  line-height: 1.45;
 }
 .negotiation-card > p,
 .negotiation-title p {
@@ -1372,7 +1365,7 @@ input:focus {
   color: #6b7280;
 }
 .mission-detail h2 {
-  margin: 6px 0 0;
+  margin: 0;
 }
 .mission-text {
   margin: 14px 0 8px !important;
@@ -1385,6 +1378,7 @@ input:focus {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 14px;
+  justify-content: flex-end;
 }
 .mission-change-offer {
   margin-top: 14px;
