@@ -939,7 +939,7 @@ input:focus {
 }
 .radio-group {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 7px 10px;
   font-size: 0.8rem;
@@ -948,9 +948,23 @@ input:focus {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  width: auto;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.radio-group input[type="radio"],
+.radio-group input[type="checkbox"] {
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  accent-color: var(--primary);
 }
 .radio-group .btn {
   margin-left: auto;
+  flex: 0 0 auto;
 }
 .negotiation-actions {
   display: grid;
