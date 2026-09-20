@@ -29,13 +29,15 @@ Deno.serve(async (request) => {
   const { data: analysis, error: analysisError } = await admin.from("ai_analyses").insert({ room_id: roomId, requester_user_id: user.id, draft_id: saved.data.id, draft_revision: revision, type: "message_mediation", visibility: "private", input_hash: inputHash }).select("id").single();
   if (analysisError || !analysis) return json({ ok: false, error: { message: "AI 심판을 준비하지 못했어요." } }, 500);
   const recommendation = { type: "object", additionalProperties: false, required: ["text"], properties: { text: { type: "string" } } };
-  const schema = { oneOf: [{ type: "object", additionalProperties: false, required: ["result_type", "risk", "inference", "recommendations"], properties: { result_type: { const: "normal" }, risk: { type: "string" }, inference: { type: "string", pattern: "^AI의 추정:" }, recommendations: { type: "array", minItems: 2, maxItems: 3, items: recommendation } } }, { type: "object", additionalProperties: false, required: ["result_type", "risk", "inference", "recommendations"], properties: { result_type: { const: "restricted" }, risk: { type: "string" }, inference: { type: "string", pattern: "^AI의 추정:" }, recommendations: { type: "array", maxItems: 0, items: recommendation } } }] };
+  // Structured Outputs는 최상위 스키마를 객체로 요구한다. normal/restricted 분기는 반환값 검증에서 강제한다.
+  const schema = { type: "object", additionalProperties: false, required: ["result_type", "risk", "inference", "recommendations"], properties: { result_type: { type: "string", enum: ["normal", "restricted"] }, risk: { type: "string" }, inference: { type: "string", pattern: "^AI의 추정:" }, recommendations: { type: "array", maxItems: 3, items: recommendation } } };
   try {
     const response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.6", input: [{ role: "system", content: "You are a neutral Korean relationship conversation referee. Never judge who is right. Return restricted for violence, threats, coercive control, or self-harm risk. For normal results, inference must start with 'AI의 추정:'." }, { role: "user", content: draft }], text: { format: { type: "json_schema", name: "message_mediation", strict: true, schema } } }) });
     const payload = await response.json();
     if (!response.ok) throw new Error(`openai_http_${response.status}`);
     const result = JSON.parse(payload.output_text ?? "{}");
-    if (!["normal", "restricted"].includes(result.result_type)) throw new Error("invalid_ai_response");
+    const recommendationCount = Array.isArray(result.recommendations) ? result.recommendations.length : -1;
+    if (!["normal", "restricted"].includes(result.result_type) || (result.result_type === "normal" && recommendationCount < 2) || (result.result_type === "restricted" && recommendationCount !== 0)) throw new Error("invalid_ai_response");
     await admin.from("ai_analyses").update({ status: "ready", result_type: result.result_type, result, updated_at: new Date().toISOString() }).eq("id", analysis.id);
     await admin.rpc("record_private_change", { p_user_id: user.id, p_room_id: roomId, p_event_type: "analysis.ready", p_resource_type: "ai_analysis", p_resource_id: analysis.id });
     return json({ ok: true, data: { analysisId: analysis.id, result } });
