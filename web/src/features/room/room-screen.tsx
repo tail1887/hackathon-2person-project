@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { getFunctionErrorMessage } from "@/lib/supabase/function-error";
 
 type Room = { id: string; status: "active" | "closed"; room_revision: number };
 type Member = { room_id: string; role: "creator" | "invitee"; public_member_key: string; room_display_name: string };
 type Message = { id: string; room_id: string; sender_member_key: string; body: string; sequence: number; sent_at: string };
 type ConnectionState = "loading" | "connected" | "recovering" | "failed";
+type JudgeResult = { result_type: "normal" | "restricted"; risk: string; inference: string; recommendations: { text: string }[] };
 
 export function RoomScreen({ roomId }: { roomId: string }) {
   const supabase = getBrowserSupabase();
@@ -15,6 +17,10 @@ export function RoomScreen({ roomId }: { roomId: string }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [connection, setConnection] = useState<ConnectionState>("loading");
+  const [draft, setDraft] = useState("");
+  const [judge, setJudge] = useState<{ id: string; result: JudgeResult }>();
+  const [judgeError, setJudgeError] = useState<string>();
+  const [isJudging, setIsJudging] = useState(false);
   const latestRevision = useRef(0);
   const recovering = useRef(false);
 
@@ -44,6 +50,24 @@ export function RoomScreen({ roomId }: { roomId: string }) {
     };
     void retry();
   }, [loadSnapshot]);
+
+  async function requestJudge() {
+    if (!supabase || !draft.trim()) return;
+    setIsJudging(true); setJudge(undefined); setJudgeError(undefined);
+    const { data, error } = await supabase.functions.invoke("ai-judge", { body: { roomId, body: draft } });
+    setIsJudging(false);
+    if (error || !data?.ok) { setJudgeError(error ? await getFunctionErrorMessage(error, "AI 심판을 준비하지 못했어요.") : data?.error?.message ?? "AI 심판을 준비하지 못했어요."); return; }
+    setJudge({ id: data.data.analysisId, result: data.data.result as JudgeResult });
+  }
+
+  async function sendChoice(choice: "original" | "recommendation") {
+    if (!supabase || !judge) return;
+    setIsJudging(true); setJudgeError(undefined);
+    const { data, error } = await supabase.functions.invoke("message-send", { body: { analysisId: judge.id, choice } });
+    setIsJudging(false);
+    if (error || !data?.ok) { setJudgeError(error ? await getFunctionErrorMessage(error, "메시지를 전송하지 못했어요.") : data?.error?.message ?? "메시지를 전송하지 못했어요."); return; }
+    setDraft(""); setJudge(undefined); await loadSnapshot();
+  }
 
   useEffect(() => {
     if (!supabase) return;
@@ -88,8 +112,10 @@ export function RoomScreen({ roomId }: { roomId: string }) {
           <button className="tool-button" disabled type="button">⚖️ AI 문철</button>
           <button className="tool-button tool-button-outline" disabled type="button">🤝 무승부 제안</button>
         </div>
-        <div className="chat-input-row"><textarea aria-label="메시지 초안" disabled placeholder="AI 심판 전송 기능은 M3에서 시작됩니다." rows={2} /><button className="primary-button" disabled type="button">확인</button></div>
+        <div className="chat-input-row"><textarea aria-label="메시지 초안" onChange={(event) => { setDraft(event.target.value); setJudge(undefined); }} placeholder="초안 메시지를 입력하세요..." rows={2} value={draft} /><button className="primary-button" disabled={isJudging || !draft.trim() || room.status !== "active"} onClick={requestJudge} type="button">{isJudging ? "확인 중…" : "확인"}</button></div>
         <p className="chat-boundary-note">초안 작성 뒤 AI 심판을 거친 메시지만 전송됩니다.</p>
+        {judgeError && <p className="notice">{judgeError}</p>}
+        {judge && <section className="judge-sheet" aria-label="AI 심판 결과"><strong>⚖️ AI 심판 결과</strong><p>{judge.result.risk}</p><p>{judge.result.inference}</p>{judge.result.result_type === "restricted" ? <button className="secondary-button" onClick={() => setJudge(undefined)} type="button">초안 수정</button> : <><p className="hint">추천: {judge.result.recommendations[0]?.text}</p><div className="button-row"><button className="secondary-button" disabled={isJudging} onClick={() => void sendChoice("original")} type="button">원문 전송</button><button className="primary-button" disabled={isJudging || !judge.result.recommendations[0]} onClick={() => void sendChoice("recommendation")} type="button">추천 전송</button></div></>}</section>}
       </section>
     </div>
   </section></main>;
