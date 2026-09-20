@@ -3,6 +3,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const headers = { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const hash = async (body: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body))), (value) => value.toString(16).padStart(2, "0")).join("");
+const riskDraftPattern = /(자살|자해|죽어\s*(버려|라)|죽일\s*(거|것|게|래|테)|해칠\s*(거|것|게|래|테)|때릴\s*(거|것|게|래|테)|폭력|협박|감금|통제)/;
+const restrictedResult = {
+  result_type: "restricted",
+  risk: "이 문장에는 AI 심판을 제공할 수 없습니다. 문장을 수정해 다시 확인해 주세요.",
+  inference: "",
+  speaker_intent: "",
+  speech_act: "statement",
+  recommendations: [],
+};
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers });
@@ -28,6 +37,12 @@ Deno.serve(async (request) => {
   const inputHash = await hash(draft);
   const { data: analysis, error: analysisError } = await admin.from("ai_analyses").insert({ room_id: roomId, requester_user_id: user.id, draft_id: saved.data.id, draft_revision: revision, type: "message_mediation", visibility: "private", input_hash: inputHash }).select("id").single();
   if (analysisError || !analysis) return json({ ok: false, error: { message: "AI 심판을 준비하지 못했어요." } }, 500);
+  // 위험 초안은 모델의 안전 거절 형식에 의존하지 않고 서버에서 즉시 전송 불가 결과로 확정한다.
+  if (riskDraftPattern.test(draft)) {
+    await admin.from("ai_analyses").update({ status: "ready", result_type: "restricted", result: restrictedResult, updated_at: new Date().toISOString() }).eq("id", analysis.id);
+    await admin.rpc("record_private_change", { p_user_id: user.id, p_room_id: roomId, p_event_type: "analysis.ready", p_resource_type: "ai_analysis", p_resource_id: analysis.id });
+    return json({ ok: true, data: { analysisId: analysis.id, result: restrictedResult } });
+  }
   const recommendation = { type: "object", additionalProperties: false, required: ["text"], properties: { text: { type: "string", description: "The exact first-person Korean message the user can send to their counterpart now. It must preserve the draft's speaker, addressee, and speech act. It is never a reply to the draft itself, advice, analysis, or an instruction to the user." } } };
   // Structured Outputs는 최상위 스키마를 객체로 요구한다. normal/restricted 분기는 반환값 검증에서 강제한다.
   const schema = { type: "object", additionalProperties: false, required: ["result_type", "risk", "inference", "speaker_intent", "speech_act", "recommendations"], properties: { result_type: { type: "string", enum: ["normal", "restricted"] }, risk: { type: "string" }, inference: { type: "string", pattern: "^AI의 추정:" }, speaker_intent: { type: "string", description: "A short summary of what the user, as the sender of the draft, is trying to communicate." }, speech_act: { type: "string", enum: ["question", "answer", "request", "statement", "boundary"] }, recommendations: { type: "array", maxItems: 3, items: recommendation } } };
