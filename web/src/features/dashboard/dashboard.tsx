@@ -307,7 +307,7 @@ export function Dashboard() {
                         <button
                           className="btn btn-sm btn-primary"
                           onClick={() =>
-                            router.push(`/rooms/${mission.room_id}`)
+                            router.push(`/missions/${mission.room_id}`)
                           }
                           type="button"
                         >

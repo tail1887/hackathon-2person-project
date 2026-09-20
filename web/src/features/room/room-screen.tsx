@@ -73,7 +73,13 @@ type Settlement = {
   active_offer_id: string | null;
 };
 
-export function RoomScreen({ roomId }: { roomId: string }) {
+export function RoomScreen({
+  roomId,
+  view = "room",
+}: {
+  roomId: string;
+  view?: "room" | "missions";
+}) {
   const supabase = getBrowserSupabase();
   const [room, setRoom] = useState<Room>();
   const [members, setMembers] = useState<Member[]>([]);
@@ -700,6 +706,65 @@ export function RoomScreen({ roomId }: { roomId: string }) {
     (review) => review.id === selectedRoomReviewId,
   );
 
+  const missionBoard = (
+    <MissionBoard
+      actions={missionActions}
+      changeOffers={missionChangeOffers}
+      error={missionError}
+      members={members}
+      missions={missions}
+      myMemberKey={myMemberKey}
+      onAction={(missionId, action) =>
+        void recordMissionAction(missionId, action)
+      }
+      onCreateChange={(missionId, text, dueDate, kind, ownerMemberKey) =>
+        void createMissionChange(missionId, text, dueDate, kind, ownerMemberKey)
+      }
+      onResolveChange={(changeOfferId, resolution) =>
+        void resolveMissionChange(changeOfferId, resolution)
+      }
+      participants={missionParticipants}
+      revisions={missionRevisions}
+      working={isMissionWorking}
+    />
+  );
+
+  if (view === "missions")
+    return (
+      <main className="app-shell">
+        <section className="app-frame mockup-app-frame">
+          <header className="app-header">
+            <Link
+              aria-label="대국 기록으로 돌아가기"
+              className="btn-icon"
+              href={`/rooms/${roomId}`}
+            >
+              ←
+            </Link>
+            <span className="app-title">
+              <span aria-hidden="true">⚖️</span> AI 심판
+            </span>
+            <Link aria-label="메인으로 돌아가기" className="btn-icon" href="/">
+              🏠
+            </Link>
+          </header>
+          <div className="app-content room-page mockup-room-page">
+            {room.status !== "closed" ? (
+              <section className="card empty-card">
+                <h1>아직 대국이 진행 중이에요</h1>
+                <p>미션 보드는 무승부 합의로 대국이 종료된 뒤 열립니다.</p>
+                <Link className="btn btn-primary" href={`/rooms/${roomId}`}>
+                  대국방으로 돌아가기
+                </Link>
+              </section>
+            ) : (
+              missionBoard
+            )}
+          </div>
+        </section>
+      </main>
+    );
+
   return (
     <main className="app-shell">
       <section className="app-frame mockup-app-frame">
@@ -751,38 +816,28 @@ export function RoomScreen({ roomId }: { roomId: string }) {
             </p>
           )}
           {room.status === "closed" && (
-            <MissionBoard
-              actions={missionActions}
-              changeOffers={missionChangeOffers}
-              error={missionError}
-              members={members}
-              missions={missions}
-              myMemberKey={myMemberKey}
-              onAction={(missionId, action) =>
-                void recordMissionAction(missionId, action)
-              }
-              onCreateChange={(
-                missionId,
-                text,
-                dueDate,
-                kind,
-                ownerMemberKey,
-              ) =>
-                void createMissionChange(
-                  missionId,
-                  text,
-                  dueDate,
-                  kind,
-                  ownerMemberKey,
-                )
-              }
-              onResolveChange={(changeOfferId, resolution) =>
-                void resolveMissionChange(changeOfferId, resolution)
-              }
-              participants={missionParticipants}
-              revisions={missionRevisions}
-              working={isMissionWorking}
-            />
+            <section className="card room-ended-card" role="status">
+              <span className="tag tag-closed">대국 종료</span>
+              <h1>대국이 종료되었어요</h1>
+              <p>
+                {missions.length > 0
+                  ? "선택한 조건으로 미션이 생성되었습니다. 미션 페이지에서 함께 이어가 볼까요?"
+                  : "조건 없이 합의가 완료되었습니다. 대국 기록은 읽기 전용으로 남아 있습니다."}
+              </p>
+              <div className="sheet-actions">
+                {missions.length > 0 && (
+                  <Link
+                    className="btn btn-primary"
+                    href={`/missions/${roomId}`}
+                  >
+                    미션 페이지로 이동
+                  </Link>
+                )}
+                <Link className="btn btn-outline" href="/">
+                  메인으로 돌아가기
+                </Link>
+              </div>
+            </section>
           )}
           {activeOffer && room.status === "active" && (
             <section className="notice-box room-review-banner">
