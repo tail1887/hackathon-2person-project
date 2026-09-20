@@ -1058,7 +1058,7 @@ export function RoomScreen({ roomId }: { roomId: string }) {
               aria-modal="true"
               aria-label="개인 형세 파악"
             >
-              <div className="sheet-content">
+              <div className="sheet-content position-sheet">
                 <header className="sheet-header">
                   <h2>📊 개인 형세 파악 (비공개)</h2>
                   <button
@@ -1074,17 +1074,25 @@ export function RoomScreen({ roomId }: { roomId: string }) {
                   🔒 본 결과는 요청자 본인에게만 제공되며 상대방에게는 노출되지
                   않습니다.
                 </section>
-                <section className="card">
-                  <h3>현재 대화 형세</h3>
-                  <p>{position.current_position}</p>
+                <section className="card position-summary-card">
+                  <div className="position-card-title">
+                    <h3>현재 대화 형세</h3>
+                    <span>AI의 추정</span>
+                  </div>
+                  <p className="position-summary-text">{position.current_position}</p>
                 </section>
-                <section className="card">
-                  <h3>내가 확인할 쟁점 &amp; AI 추정</h3>
-                  <ul>
+                <section className="card position-issues-card">
+                  <div className="position-card-title">
+                    <h3>내가 확인할 쟁점</h3>
+                    <span>AI의 추정</span>
+                  </div>
+                  <ul className="position-issues-list">
                     {position.issues.map((issue) => (
                       <li key={issue}>{issue}</li>
                     ))}
                   </ul>
+                </section>
+                <section className="card position-next-card">
                   <h3>다음 판단</h3>
                   <p>{position.next_move}</p>
                 </section>

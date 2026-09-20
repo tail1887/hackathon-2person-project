@@ -861,6 +861,7 @@ input:focus {
 .sheet-actions .btn {
   flex: 1;
 }
+.position-card-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }.position-card-title span { color: var(--primary); font-size: .72rem; font-weight: 700; }.position-sheet .card { margin-bottom: 10px; }.position-sheet .card h3 { margin: 0; color: var(--text); font-size: .96rem; }.position-summary-card { border-left: 4px solid var(--primary); background: #fafafa; }.position-summary-text { margin: 8px 0 0 !important; color: var(--text) !important; font-size: .92rem !important; font-weight: 600; line-height: 1.55 !important; }.position-issues-list { display: grid; gap: 8px; margin: 10px 0 0 !important; padding: 0 !important; list-style: none; }.position-issues-list li { position: relative; padding-left: 15px; color: var(--text-muted); font-size: .83rem; line-height: 1.5; }.position-issues-list li::before { position: absolute; left: 0; color: var(--primary); content: "•"; font-weight: 800; }.position-next-card { border-color: #c7d2fe; background: #eef2ff; }.position-next-card h3 { color: var(--primary) !important; }.position-next-card p { margin: 8px 0 0 !important; color: #3730a3 !important; font-size: .86rem !important; font-weight: 600; line-height: 1.55 !important; }
 .negotiation-overlay {
   z-index: 60;
 }
