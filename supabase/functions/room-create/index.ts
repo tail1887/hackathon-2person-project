@@ -1,10 +1,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+const headers = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 const randomToken = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, "0")).join("");
 const digest = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
 Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") return new Response("ok", { headers });
+  if (request.method !== "POST") return json({ ok: false, error: { code: "method_not_allowed", message: "허용하지 않는 요청이에요." } }, 405);
   const authorization = request.headers.get("Authorization");
   if (!authorization) return json({ ok: false, error: { code: "unauthenticated", message: "로그인이 필요해요." } }, 401);
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authorization } } });
