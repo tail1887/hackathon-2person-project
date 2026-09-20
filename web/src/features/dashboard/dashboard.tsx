@@ -8,11 +8,14 @@ import { getFunctionErrorMessage } from "@/lib/supabase/function-error";
 import { Avatar } from "@/features/profile/avatar";
 
 type Profile = { display_name: string };
+type ActiveRoom = { id: string; status: "active" };
 
 export function Dashboard() {
   const supabase = getBrowserSupabase();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile>();
+  const [activeRoom, setActiveRoom] = useState<ActiveRoom | null>();
+  const [isRoomLoading, setIsRoomLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [mode, setMode] = useState<"home" | "start" | "waiting">("home");
   const [inviteCode, setInviteCode] = useState("");
@@ -27,16 +30,26 @@ export function Dashboard() {
         setError("로그인 정보를 불러오지 못했어요.");
         return;
       }
-      const { data, error: profileError } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("id", user.id)
-        .single();
+      const [{ data, error: profileError }, { data: rooms, error: roomError }] = await Promise.all([
+        supabase.from("profiles").select("display_name").eq("id", user.id).single(),
+        supabase
+          .from("room_public")
+          .select("id, status")
+          .eq("status", "active")
+          .order("activated_at", { ascending: false })
+          .limit(1),
+      ]);
       if (profileError) {
         setError("프로필을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
         return;
       }
       setProfile(data);
+      if (roomError) {
+        setError("진행 중인 대국을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+      } else {
+        setActiveRoom((rooms?.[0] as ActiveRoom | undefined) ?? null);
+      }
+      setIsRoomLoading(false);
     });
   }, [supabase]);
 
@@ -89,10 +102,10 @@ export function Dashboard() {
         </header>
         <div className="app-content">
           <div className="page-intro"><p className="eyebrow">오늘의 대국</p><h1>시작 화면</h1><p className="muted">두 사람의 대화를 차분히 시작해 볼까요?</p></div>
-          {!supabase ? <p className="notice">Supabase 공개 연결값이 아직 설정되지 않았어요.</p> : !profile ? <p className="notice">메인을 불러오는 중…</p> : mode === "start" ? <section className="dashboard-grid"><h2 className="section-title">대국 시작하기</h2><article className="card"><h3>1. 상대 초대 만들기</h3><p className="card-sub">초대가 수락될 때 두 사람이 함께 대국방에 입장합니다.</p><button className="primary-button" disabled={isWorking} onClick={createRoom} type="button">{isWorking ? "초대를 준비하는 중…" : "초대 링크 만들기"}</button></article><article className="card"><h3>2. 초대 코드로 입장</h3><p className="card-sub">공유받은 6자리 코드를 입력해 입장합니다.</p><input aria-label="6자리 초대 코드" maxLength={6} onChange={(event) => setInviteCode(event.target.value.replace(/\D/g, ""))} placeholder="예: 123456" value={inviteCode} /><button className="secondary-button" disabled={isWorking} onClick={acceptCode} type="button">초대 코드로 입장</button></article>{error && <p className="notice">{error}</p>}</section> : mode === "waiting" && createdInvite ? <section className="dashboard-grid"><article className="card empty-card"><p aria-hidden="true" style={{fontSize:"2.5rem"}}>💌</p><h2>초대를 준비했어요</h2><p className="card-sub">상대방에게 초대 링크나 코드를 전달해 주세요.</p><div className="invite-code">{createdInvite.code}</div><p className="notice">상대가 입장하는 순간 대국방이 생성됩니다.</p><button className="secondary-button" onClick={copyInviteLink} type="button">초대 링크 복사</button><a className="invite-link" href={`/invite/${createdInvite.token}`}>초대 링크 열기</a>{copyMessage && <p aria-live="polite" className="hint">{copyMessage}</p>}</article></section> : (
+          {!supabase ? <p className="notice">Supabase 공개 연결값이 아직 설정되지 않았어요.</p> : !profile ? <p className="notice">메인을 불러오는 중…</p> : mode === "start" && !activeRoom ? <section className="dashboard-grid"><h2 className="section-title">대국 시작하기</h2><article className="card"><h3>1. 상대 초대 만들기</h3><p className="card-sub">초대가 수락될 때 두 사람이 함께 대국방에 입장합니다.</p><button className="primary-button" disabled={isWorking} onClick={createRoom} type="button">{isWorking ? "초대를 준비하는 중…" : "초대 링크 만들기"}</button></article><article className="card"><h3>2. 초대 코드로 입장</h3><p className="card-sub">공유받은 6자리 코드를 입력해 입장합니다.</p><input aria-label="6자리 초대 코드" maxLength={6} onChange={(event) => setInviteCode(event.target.value.replace(/\D/g, ""))} placeholder="예: 123456" value={inviteCode} /><button className="secondary-button" disabled={isWorking} onClick={acceptCode} type="button">초대 코드로 입장</button></article>{error && <p className="notice">{error}</p>}</section> : mode === "waiting" && createdInvite ? <section className="dashboard-grid"><article className="card empty-card"><p aria-hidden="true" style={{fontSize:"2.5rem"}}>💌</p><h2>초대를 준비했어요</h2><p className="card-sub">상대방에게 초대 링크나 코드를 전달해 주세요.</p><div className="invite-code">{createdInvite.code}</div><p className="notice">상대가 입장하는 순간 대국방이 생성됩니다.</p><button className="secondary-button" onClick={copyInviteLink} type="button">초대 링크 복사</button><a className="invite-link" href={`/invite/${createdInvite.token}`}>초대 링크 열기</a>{copyMessage && <p aria-live="polite" className="hint">{copyMessage}</p>}</article></section> : (
             <section className="dashboard-grid">
               <div><h2 className="section-title">진행 중인 미션</h2><article className="card empty-card"><p>진행 중인 미션이 없습니다.</p></article></div>
-              <div><h2 className="section-title">진행 중인 대국</h2><article className="card room-card"><span className="tag tag-pending">대국 준비</span><h3>새 대국을 시작할까요?</h3><p className="card-sub">상대와 연결되면 이곳에서 대국을 이어갈 수 있어요.</p><button className="primary-button" onClick={() => setMode("start")} type="button">⚔ 대국 시작하기</button></article></div>
+              <div><h2 className="section-title">진행 중인 대국</h2>{isRoomLoading ? <article className="card empty-card"><p>진행 중인 대국을 불러오는 중…</p></article> : activeRoom ? <article className="card room-card"><span className="tag tag-active">진행 중</span><h3>진행 중인 대국이 있어요</h3><p className="card-sub">마지막으로 참여한 대국방으로 돌아갈 수 있어요.</p><button className="primary-button" onClick={() => router.push(`/rooms/${activeRoom.id}`)} type="button">⚔ 대국방으로 돌아가기</button></article> : <article className="card room-card"><span className="tag tag-pending">대국 없음</span><h3>새 대국을 시작할까요?</h3><p className="card-sub">상대와 연결되면 이곳에서 대국을 이어갈 수 있어요.</p><button className="primary-button" onClick={() => setMode("start")} type="button">⚔ 대국 시작하기</button></article>}</div>
               <div><h2 className="section-title">지난 대국</h2><article className="card empty-card"><p>완료한 대국이 아직 없습니다.</p></article></div>
             </section>
           )}
