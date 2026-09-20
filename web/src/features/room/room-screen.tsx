@@ -143,7 +143,7 @@ export function RoomScreen({ roomId }: { roomId: string }) {
         .maybeSingle(),
       supabase
         .from("room_member_public")
-        .select("room_id,role,public_member_key,room_display_name")
+        .select("room_id,role,public_member_key,room_display_name,is_self")
         .eq("room_id", roomId),
       supabase
         .from("room_message_public")
