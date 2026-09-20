@@ -113,7 +113,16 @@ export function NegotiationPanel({
   );
   const editor = (
     <section className="card negotiation-card">
-      <h2>무승부 제안 작성 (제안자)</h2>
+      <h2>
+        {isCountered ? "무승부 제안 수정 (제안자)" : "무승부 제안 작성 (제안자)"}
+      </h2>
+      {isCountered && counter && (
+        <div className="notice-box">
+          <strong>상대의 카운터오퍼</strong>
+          <br />
+          {counter.body}
+        </div>
+      )}
       <div className="form-group">
         <p className="form-label">상대 선택 방식</p>
         <div className="radio-group">
