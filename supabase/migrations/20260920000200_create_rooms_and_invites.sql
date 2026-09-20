@@ -70,9 +70,8 @@ $$;
 revoke all on function public.is_room_member(uuid) from public;
 grant execute on function public.is_room_member(uuid) to authenticated;
 
--- Base tables retain internal user IDs for server commands only. A user can
--- directly read at most their own base rows; shared data is exposed through
--- the public projections below, which omit those IDs.
+-- Base tables retain internal user IDs for server commands only. Browser
+-- clients use the public projections below, which omit those IDs.
 create policy "rooms_select_creator_only" on public.rooms for select to authenticated
   using (creator_user_id = (select auth.uid()));
 create policy "room_members_select_own" on public.room_members for select to authenticated
