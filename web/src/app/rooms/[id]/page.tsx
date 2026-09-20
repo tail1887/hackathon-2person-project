@@ -1,1 +1,6 @@
-export default function RoomPage() { return <main className="auth-shell"><section className="auth-card"><p className="eyebrow">대국방</p><h1>대국방을 준비하는 중이에요</h1><p className="muted">상대 입장과 실시간 대국방 화면은 다음 페이즈에서 연결합니다.</p></section></main>; }
+import { RoomScreen } from "@/features/room/room-screen";
+
+export default async function RoomPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <RoomScreen roomId={id} />;
+}

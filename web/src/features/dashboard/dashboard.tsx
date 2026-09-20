@@ -40,6 +40,17 @@ export function Dashboard() {
     });
   }, [supabase]);
 
+  useEffect(() => {
+    if (!supabase || mode !== "waiting" || !createdInvite) return;
+    const channel = supabase.channel(`invite:${createdInvite.inviteId}`, { config: { private: true } })
+      .on("broadcast", { event: "room.member_joined" }, ({ payload }) => {
+        const roomId = (payload as { room_id?: string }).room_id;
+        if (roomId) router.push(`/rooms/${roomId}`);
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [createdInvite, mode, router, supabase]);
+
   async function createRoom() {
     if (!supabase) return; setIsWorking(true); setError(undefined);
     const { data, error: invokeError } = await supabase.functions.invoke("room-create");
