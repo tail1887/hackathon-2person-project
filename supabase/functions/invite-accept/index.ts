@@ -13,7 +13,7 @@ Deno.serve(async (request) => {
  const {code,token}=await request.json().catch(()=>({})); const validCode=typeof code==="string"&&/^\d{6}$/.test(code); const validToken=typeof token==="string"&&token.length>20;
  if(!validCode&&!validToken) return json({ok:false,error:{code:"invalid_invite",message:messages.invalid_invite}},400);
  const client=createClient(supabaseUrl,supabaseAnonKey,{global:{headers:{Authorization:authorization}}});
- const {data,error}=await client.rpc("accept_invite",{p_code:validCode?code:null,p_token_digest:validToken?await digest(token):null}); const result=data?.[0]; const errorCode=result?.error_code ?? (error ? "invalid_invite" : null);
+ const {data,error}=await client.rpc("accept_pending_invite",{p_code:validCode?code:null,p_token_digest:validToken?await digest(token):null}); const result=data?.[0]; const errorCode=result?.error_code ?? (error ? "invalid_invite" : null);
  if(errorCode) return json({ok:false,error:{code:errorCode,message:messages[errorCode]??messages.invalid_invite}},400);
  return json({ok:true,data:{roomId:result.room_id}});
 });

@@ -24,12 +24,12 @@ Deno.serve(async (request) => {
   const supabase = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authorization } } });
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const token = randomToken(); const code = String(Math.floor(100000 + Math.random() * 900000));
-    const { data, error } = await supabase.rpc("create_room_with_invite", { p_code: code, p_token_digest: await digest(token) });
+    const { data, error } = await supabase.rpc("create_pending_invite", { p_code: code, p_token_digest: await digest(token) });
     const result = data?.[0];
-    if (error || !result) return json({ ok: false, error: { code: "room_create_failed", message: "대국방을 준비하지 못했어요." } }, 500);
+    if (error || !result) return json({ ok: false, error: { code: "room_create_failed", message: "초대를 준비하지 못했어요." } }, 500);
     if (result.error_code === "invite_generation_failed") continue;
-    if (result.error_code) return json({ ok: false, error: { code: result.error_code, message: result.error_code === "active_room_exists" ? "이미 진행 중인 대국이 있어요." : "대국방을 준비하지 못했어요." } }, 400);
-    return json({ ok: true, data: { roomId: result.room_id, code, token } });
+    if (result.error_code) return json({ ok: false, error: { code: result.error_code, message: result.error_code === "active_room_exists" ? "이미 진행 중인 대국이 있어요." : "초대를 준비하지 못했어요." } }, 400);
+    return json({ ok: true, data: { inviteId: result.invite_id, code, token } });
   }
-  return json({ ok: false, error: { code: "room_create_failed", message: "대국방을 준비하지 못했어요." } }, 500);
+  return json({ ok: false, error: { code: "room_create_failed", message: "초대를 준비하지 못했어요." } }, 500);
 });
