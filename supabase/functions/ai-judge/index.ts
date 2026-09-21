@@ -31,10 +31,18 @@ Deno.serve(async (request) => {
   const { data: membership } = await admin.from("room_members").select("room_id").eq("room_id", roomId).eq("user_id", user.id).maybeSingle();
   const { data: room } = await admin.from("rooms").select("status").eq("id", roomId).maybeSingle();
   if (!membership || room?.status !== "active") return json({ ok: false, error: { message: "현재 대국방에서는 AI 심판을 요청할 수 없어요." } }, 403);
-  const { data: current } = await admin.from("message_drafts").select("id,revision").eq("room_id", roomId).eq("author_user_id", user.id).eq("status", "active").maybeSingle();
-  const revision = (current?.revision ?? 0) + 1;
+  const [{ data: current }, { data: latestDraft }] = await Promise.all([
+    admin.from("message_drafts").select("id,revision").eq("room_id", roomId).eq("author_user_id", user.id).eq("status", "active").limit(1).maybeSingle(),
+    admin.from("message_drafts").select("revision").eq("room_id", roomId).eq("author_user_id", user.id).order("revision", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  // revision은 활성 초안 하나의 번호가 아니라 방 안에서 이 사용자가 만든 모든 초안에 대해 단조 증가해야 한다.
+  // 전송된 초안만 남은 경우에도 이전 revision을 재사용하면 DB 고유 제약에 걸린다.
+  const revision = Math.max(current?.revision ?? 0, latestDraft?.revision ?? 0) + 1;
   const saved = current ? await admin.from("message_drafts").update({ body: draft, revision, saved_at: new Date().toISOString() }).eq("id", current.id).select("id").single() : await admin.from("message_drafts").insert({ room_id: roomId, author_user_id: user.id, body: draft, revision }).select("id").single();
-  if (saved.error || !saved.data) return json({ ok: false, error: { message: "초안을 저장하지 못했어요." } }, 500);
+  if (saved.error || !saved.data) {
+    console.error("draft_save_failed", saved.error?.code ?? "unknown");
+    return json({ ok: false, error: { message: "초안을 저장하지 못했어요." } }, 500);
+  }
   await admin.from("ai_analyses").update({ status: "stale", updated_at: new Date().toISOString() }).eq("draft_id", saved.data.id).eq("status", "ready");
   const inputHash = await hash(draft);
   const { data: analysis, error: analysisError } = await admin.from("ai_analyses").insert({ room_id: roomId, requester_user_id: user.id, draft_id: saved.data.id, draft_revision: revision, type: "message_mediation", visibility: "private", input_hash: inputHash }).select("id").single();
