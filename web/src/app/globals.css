@@ -458,6 +458,15 @@ input:focus {
   font-size: 0.7rem;
   text-align: center;
 }
+.draft-resume-note {
+  margin: 8px 0 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
 .sr-only {
   position: absolute;
   width: 1px;

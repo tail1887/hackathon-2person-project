@@ -86,6 +86,7 @@ export function RoomScreen({
   const [messages, setMessages] = useState<Message[]>([]);
   const [connection, setConnection] = useState<ConnectionState>("loading");
   const [draft, setDraft] = useState("");
+  const [hasActiveDraft, setHasActiveDraft] = useState(false);
   const [judge, setJudge] = useState<{ id: string; result: JudgeResult }>();
   const [judgeError, setJudgeError] = useState<string>();
   const [isJudging, setIsJudging] = useState(false);
@@ -122,6 +123,7 @@ export function RoomScreen({
   const [missionError, setMissionError] = useState<string>();
   const latestRevision = useRef(0);
   const recovering = useRef(false);
+  const draftWasEdited = useRef(false);
 
   const loadSnapshot = useCallback(async () => {
     if (!supabase) return false;
@@ -141,6 +143,7 @@ export function RoomScreen({
       actionsResult,
       changeOffersResult,
       revisionsResult,
+      draftResult,
     ] = await Promise.all([
       supabase
         .from("room_public")
@@ -229,6 +232,12 @@ export function RoomScreen({
         )
         .eq("room_id", roomId)
         .order("revision"),
+      supabase
+        .from("private_draft_public")
+        .select("id,body,revision,status,saved_at")
+        .eq("room_id", roomId)
+        .eq("status", "active")
+        .maybeSingle(),
     ]);
     if (
       roomResult.error ||
@@ -263,6 +272,11 @@ export function RoomScreen({
       (changeOffersResult.data ?? []) as MissionChangeOffer[],
     );
     setMissionRevisions((revisionsResult.data ?? []) as MissionRevision[]);
+    const savedDraft = draftResult.data as { body: string } | null;
+    setHasActiveDraft(Boolean(savedDraft));
+    if (savedDraft && !draftWasEdited.current) {
+      setDraft(savedDraft.body);
+    }
     return true;
   }, [roomId, supabase]);
 
@@ -308,6 +322,7 @@ export function RoomScreen({
       id: data.data.analysisId,
       result: data.data.result as JudgeResult,
     });
+    setHasActiveDraft(true);
   }
 
   async function sendChoice(
@@ -330,6 +345,8 @@ export function RoomScreen({
       return;
     }
     setDraft("");
+    draftWasEdited.current = false;
+    setHasActiveDraft(false);
     setJudge(undefined);
     await loadSnapshot();
   }
@@ -1014,6 +1031,7 @@ export function RoomScreen({
               <textarea
                 aria-label="메시지 초안"
                 onChange={(event) => {
+                  draftWasEdited.current = true;
                   setDraft(event.target.value);
                   setJudge(undefined);
                 }}
@@ -1036,6 +1054,12 @@ export function RoomScreen({
               * 초안 작성 후 [확인]을 누르면 AI 심판 시트가 필수 개시됩니다.
               (직접 전송 불가)
             </p>
+            {hasActiveDraft && !judge && (
+              <p className="draft-resume-note">
+                전송하지 않은 초안이에요. 수정한 뒤 <strong>[확인]</strong>을
+                누르면 AI 심판을 다시 받을 수 있어요.
+              </p>
+            )}
             {judgeError && <p className="notice">{judgeError}</p>}
             {toolError && <p className="notice">{toolError}</p>}
           </section>
